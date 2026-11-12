@@ -1,7 +1,12 @@
 package com.hmdp.utils;
 
-import cn.hutool.json.JSONObject;
-import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
@@ -43,6 +48,7 @@ public class CacheClient {
   private static final int RETRY_BASE_MILLIS = 20;
   private static final int RETRY_JITTER_MILLIS = 20;
   private final StringRedisTemplate redis;
+  private final ObjectMapper mapper;
   private final AtomicLong generation = new AtomicLong();
   private final LoadingCache<LoadRequest, CacheSnapshot> local =
       Caffeine.newBuilder()
@@ -74,7 +80,58 @@ public class CacheClient {
   private MeterRegistry metrics;
 
   public CacheClient(StringRedisTemplate redis) {
+    this(redis, defaultObjectMapper());
+  }
+
+  @Autowired
+  public CacheClient(StringRedisTemplate redis, ObjectMapper mapper) {
     this.redis = redis;
+    this.mapper = mapper;
+  }
+
+  /** Same settings Spring Boot applies to its ObjectMapper; used when constructed by hand. */
+  static ObjectMapper defaultObjectMapper() {
+    return JsonMapper.builder()
+        .findAndAddModules()
+        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+        .serializationInclusion(JsonInclude.Include.NON_NULL)
+        .build();
+  }
+
+  private String toJson(Object value) {
+    try {
+      return mapper.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      throw new IllegalStateException("缓存对象无法序列化", e);
+    }
+  }
+
+  private JsonNode parse(String payload) {
+    try {
+      JsonNode node = mapper.readTree(payload);
+      if (node == null || !node.isObject()) {
+        throw new UndecodableCacheValue(null);
+      }
+      return node;
+    } catch (JsonProcessingException e) {
+      throw new UndecodableCacheValue(e);
+    }
+  }
+
+  private static LocalDateTime expireTimeOf(JsonNode node) {
+    try {
+      return LocalDateTime.parse(node.get("expireTime").asText());
+    } catch (RuntimeException e) {
+      throw new UndecodableCacheValue(e);
+    }
+  }
+
+  /** A cached value that cannot be read, such as an entry written by an older serializer. */
+  static final class UndecodableCacheValue extends RuntimeException {
+    UndecodableCacheValue(Throwable cause) {
+      super("缓存内容无法解析", cause);
+    }
   }
 
   @Autowired
@@ -158,7 +215,7 @@ public class CacheClient {
         .opsForValue()
         .set(
             key,
-            JSONUtil.toJsonStr(value),
+            toJson(value),
             calculateTtlMillisWithJitter(duration, durationUnit),
             TimeUnit.MILLISECONDS);
   }
@@ -168,25 +225,28 @@ public class CacheClient {
     data.setData(value);
     data.setExpireTime(LocalDateTime.now().plusSeconds(durationUnit.toSeconds(duration)));
     invalidate(key);
-    redis.opsForValue().set(key, JSONUtil.toJsonStr(data));
+    redis.opsForValue().set(key, toJson(data));
   }
 
-  private <R> R decode(String json, Class<R> type) {
-    JSONObject object = JSONUtil.parseObj(json);
-    if (object.containsKey("expireTime") && object.containsKey("data")) {
-      return JSONUtil.toBean(object.getJSONObject("data"), type);
+  private <R> R decode(String payload, Class<R> type) {
+    JsonNode node = parse(payload);
+    if (node.has("expireTime") && node.has("data")) {
+      node = node.get("data");
     }
-    return JSONUtil.toBean(object, type);
+    try {
+      return mapper.treeToValue(node, type);
+    } catch (JsonProcessingException | IllegalArgumentException e) {
+      throw new UndecodableCacheValue(e);
+    }
   }
 
-  private boolean isUsableCachePayload(String json) {
-    if (json.isEmpty()) {
+  private boolean isUsableCachePayload(String payload) {
+    if (payload.isEmpty()) {
       return true;
     }
     try {
-      JSONObject object = JSONUtil.parseObj(json);
-      return !object.containsKey("expireTime")
-          || LocalDateTime.parse(object.getStr("expireTime")).isAfter(LocalDateTime.now());
+      JsonNode node = parse(payload);
+      return !node.has("expireTime") || expireTimeOf(node).isAfter(LocalDateTime.now());
     } catch (RuntimeException corrupt) {
       return false;
     }
@@ -327,7 +387,7 @@ public class CacheClient {
               calculateTtlMillisWithJitter(duration, durationUnit),
               () -> {
                 R value = source.apply(id);
-                return value == null ? "" : JSONUtil.toJsonStr(value);
+                return value == null ? "" : toJson(value);
               });
       snapshot = local.getIfPresent(request);
       if (snapshot != null && snapshot.fresh()) {
@@ -345,7 +405,17 @@ public class CacheClient {
         RequestCacheScope.put(scopeKey, snapshot);
       }
     }
-    return snapshot.json.isEmpty() ? null : decode(snapshot.json, type);
+    if (snapshot.json.isEmpty()) {
+      return null;
+    }
+    try {
+      return decode(snapshot.json, type);
+    } catch (UndecodableCacheValue unreadable) {
+      // Old or corrupt payload: drop every cached copy and answer from the source this time.
+      recordCacheReadOutcome("decode", "invalid");
+      invalidate(key);
+      return source.apply(id);
+    }
   }
 
   private static final class LoadRequest {
@@ -388,18 +458,20 @@ public class CacheClient {
     if (json == null || json.isEmpty()) {
       return queryWithMutex(prefix, id, type, source, duration, durationUnit);
     }
-    JSONObject object;
+    R value;
+    LocalDateTime expireTime;
     try {
-      object = JSONUtil.parseObj(json);
-    } catch (RuntimeException corrupt) {
+      JsonNode node = parse(json);
+      value = decode(json, type);
+      if (!node.has("expireTime")) {
+        return value;
+      }
+      expireTime = expireTimeOf(node);
+    } catch (UndecodableCacheValue corrupt) {
       invalidate(key);
       return queryWithMutex(prefix, id, type, source, duration, durationUnit);
     }
-    if (!object.containsKey("expireTime")) {
-      return decode(json, type);
-    }
-    R value = decode(json, type);
-    if (LocalDateTime.parse(object.getStr("expireTime")).isAfter(LocalDateTime.now())) {
+    if (expireTime.isAfter(LocalDateTime.now())) {
       return value;
     }
     String lockKey = "lock:cache:" + key;
@@ -420,7 +492,7 @@ public class CacheClient {
                 redis.execute(
                     FILL,
                     Arrays.asList(key, lockKey, key + ":version"),
-                    fresh == null ? "" : JSONUtil.toJsonStr(data),
+                    fresh == null ? "" : toJson(data),
                     String.valueOf(calculateTtlMillisWithJitter(duration * 2, durationUnit)),
                     revision,
                     owner);

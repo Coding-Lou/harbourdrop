@@ -1,6 +1,5 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
@@ -66,8 +65,6 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
       return Result.ok(Collections.emptyList());
     }
     return Result.ok(
-        userService.listByIds(ids).stream()
-            .map(u -> BeanUtil.copyProperties(u, UserDTO.class))
-            .collect(Collectors.toList()));
+        userService.listByIds(ids).stream().map(UserDTO::from).collect(Collectors.toList()));
   }
 }

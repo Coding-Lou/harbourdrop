@@ -4,7 +4,6 @@ import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.hmdp.utils.RedisConstants.SHOP_GEO_KEY;
 
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -34,6 +33,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 /**
  * 服务实现类
@@ -168,7 +168,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
               distanceMap.put(shopIdStr, distance);
             });
     // 5.根据id查询Shop
-    String idStr = StrUtil.join(",", ids);
+    String idStr = StringUtils.collectionToDelimitedString(ids, ",");
     List<Shop> shops = query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list();
     for (Shop shop : shops) {
       shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
@@ -208,7 +208,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
             || y > 90)) {
       return Result.fail("坐标超出范围");
     }
-    String sort = StrUtil.blankToDefault(criteria.getSort(), "score");
+    String sort = StringUtils.hasText(criteria.getSort()) ? criteria.getSort() : "score";
     if (!"score".equals(sort) && !"price".equals(sort) && !"distance".equals(sort)) {
       return Result.fail("sort 只支持 score、price、distance");
     }
@@ -218,10 +218,10 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
 
     QueryWrapper<Shop> query = new QueryWrapper<>();
     query.eq("type_id", criteria.getTypeId());
-    if (StrUtil.isNotBlank(criteria.getKeyword())) {
+    if (StringUtils.hasText(criteria.getKeyword())) {
       query.like("name", criteria.getKeyword().trim());
     }
-    if (StrUtil.isNotBlank(criteria.getArea())) {
+    if (StringUtils.hasText(criteria.getArea())) {
       String area = criteria.getArea().trim();
       query.and(q -> q.like("area", area).or().like("address", area));
     }
@@ -305,7 +305,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     QueryWrapper<Shop> query = new QueryWrapper<>();
     query
         .eq(typeId != null, "type_id", typeId)
-        .like(StrUtil.isNotBlank(keyword), "name", keyword.trim());
+        .like(StringUtils.hasText(keyword), "name", keyword.trim());
     if ("price".equals(sort)) {
       query.orderByAsc("avg_price");
     } else {
@@ -352,7 +352,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     // 根据类型分页查询
     Page<Shop> page =
         query()
-            .like(StrUtil.isNotBlank(name), "name", name)
+            .like(StringUtils.hasText(name), "name", name)
             .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
     // 返回数据
     return Result.ok(page.getRecords());

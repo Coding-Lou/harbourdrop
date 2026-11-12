@@ -3,8 +3,6 @@ package com.hmdp.utils;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.UserDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -26,7 +24,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
       throws Exception {
     // 1.获取请求头中的token
     String token = request.getHeader("authorization");
-    if (StrUtil.isBlank(token)) {
+    if (token == null || token.isBlank()) {
       return true;
     }
     // 2.基于TOKEN获取redis中的用户
@@ -37,7 +35,7 @@ public class RefreshTokenInterceptor implements HandlerInterceptor {
       return true;
     }
     // 5.将查询到的hash数据转为UserDTO
-    UserDTO userDTO = BeanUtil.fillBeanWithMap(userMap, new UserDTO(), false);
+    UserDTO userDTO = UserDTO.fromRedisHash(userMap);
     // 6.存在，保存用户信息到 ThreadLocal
     UserHolder.saveUser(userDTO);
     // 7.刷新token有效期

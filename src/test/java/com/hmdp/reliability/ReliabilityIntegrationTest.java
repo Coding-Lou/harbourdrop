@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.controller.UploadController;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.ShopSearchDTO;
@@ -608,7 +608,7 @@ class ReliabilityIntegrationTest extends IntegrationTestBase {
                   new HttpEntity<>(headers),
                   String.class)
               .getBody();
-      assertTrue(JSONUtil.parseObj(response).getBool("success"));
+      assertTrue(new ObjectMapper().readTree(response).get("success").asBoolean());
       outbox.relayOutboxBatch();
       assertFalse(Files.exists(directory.resolve(unused.substring(1))));
     } finally {

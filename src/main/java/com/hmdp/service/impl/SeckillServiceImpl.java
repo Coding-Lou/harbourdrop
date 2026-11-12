@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillPublication;
 import com.hmdp.entity.SeckillReservation;
@@ -73,6 +74,9 @@ public class SeckillServiceImpl implements ISeckillService {
   private static final DefaultRedisScript<Long> STREAM_LAG = RedisScripts.number("stream-lag.lua");
   private static final DefaultRedisScript<Long> COMPENSATE =
       RedisScripts.number("seckill-compensate.lua");
+
+  @Resource
+  private ObjectMapper objectMapper;
 
   @Resource
   private BusinessOutboxMapper businessOutboxMapper;
@@ -386,10 +390,15 @@ public class SeckillServiceImpl implements ISeckillService {
   private void saveDeadLetter(
       MapRecord<String, Object, Object> record, Long orderId, RuntimeException e) {
     seckillReservationMapper.insertDeadLetter(
-        record.getId().getValue(),
-        orderId,
-        JSONUtil.toJsonStr(record.getValue()),
-        summarizeFailureReason(e));
+        record.getId().getValue(), orderId, toJson(record.getValue()), summarizeFailureReason(e));
+  }
+
+  private String toJson(Object value) {
+    try {
+      return objectMapper.writeValueAsString(value);
+    } catch (JsonProcessingException e) {
+      return String.valueOf(value);
+    }
   }
 
   private static class InvalidOrderMessage extends RuntimeException {

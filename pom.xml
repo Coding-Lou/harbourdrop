@@ -121,12 +121,6 @@
             <artifactId>mybatis-plus-jsqlparser</artifactId>
             <version>3.5.16</version>
         </dependency>
-        <!--hutool-->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
-            <version>5.7.17</version>
-        </dependency>
         <!--redisson-->
         <dependency>
             <groupId>org.redisson</groupId>

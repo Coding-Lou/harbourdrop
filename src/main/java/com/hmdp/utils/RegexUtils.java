@@ -1,7 +1,5 @@
 package com.hmdp.utils;
 
-import cn.hutool.core.util.StrUtil;
-
 /**
  * @author 虎哥
  */
@@ -38,7 +36,7 @@ public class RegexUtils {
 
   // 校验是否不符合正则格式
   private static boolean mismatch(String str, String regex) {
-    if (StrUtil.isBlank(str)) {
+    if (str == null || str.isBlank()) {
       return true;
     }
     return !str.matches(regex);

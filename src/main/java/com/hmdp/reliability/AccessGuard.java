@@ -1,6 +1,7 @@
 package com.hmdp.reliability;
 
-import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.dto.Result;
 import com.hmdp.service.IOperationAuditService;
 import com.hmdp.utils.UserHolder;
@@ -18,6 +19,8 @@ import org.springframework.web.util.UrlPathHelper;
 
 @Component
 public class AccessGuard implements HandlerInterceptor {
+  private static final ObjectMapper JSON =
+      new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
   @Resource
   private IOperationAuditService operationAuditService;
@@ -131,7 +134,7 @@ public class AccessGuard implements HandlerInterceptor {
   private boolean reject(HttpServletResponse res, int status, String text) throws Exception {
     res.setStatus(status);
     res.setContentType("application/json;charset=UTF-8");
-    res.getWriter().write(JSONUtil.toJsonStr(Result.fail(text)));
+    res.getWriter().write(JSON.writeValueAsString(Result.fail(text)));
     return false;
   }
 

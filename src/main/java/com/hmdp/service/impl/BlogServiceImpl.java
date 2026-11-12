@@ -1,7 +1,5 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -33,6 +31,7 @@ import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.util.StringUtils;
 
 /**
  * 服务实现类
@@ -142,11 +141,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     if (ids.isEmpty()) {
       return Result.ok(Collections.emptyList());
     }
-    String idStr = StrUtil.join(",", ids);
+    String idStr = StringUtils.collectionToDelimitedString(ids, ",");
     // 3.根据用户id查询用户 WHERE id IN ( 5 , 1 ) ORDER BY FIELD(id, 5, 1)
     List<UserDTO> userDTOS =
         userService.query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list().stream()
-            .map(user -> BeanUtil.copyProperties(user, UserDTO.class))
+            .map(UserDTO::from)
             .collect(Collectors.toList());
     // 4.返回
     return Result.ok(userDTOS);
@@ -222,7 +221,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     }
 
     // 5.根据id查询blog
-    String idStr = StrUtil.join(",", ids);
+    String idStr = StringUtils.collectionToDelimitedString(ids, ",");
     List<Blog> blogs = query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list();
 
     enrich(blogs);

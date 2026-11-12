@@ -6,10 +6,6 @@ import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 import static com.hmdp.utils.RedisConstants.USER_SIGN_KEY;
 
-import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.bean.copier.CopyOptions;
-import cn.hutool.core.lang.UUID;
-import cn.hutool.core.util.RandomUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
@@ -19,6 +15,7 @@ import com.hmdp.mapper.UserMapper;
 import com.hmdp.reliability.RateLimiter;
 import com.hmdp.reliability.RedisScripts;
 import com.hmdp.service.IUserService;
+import com.hmdp.utils.RandomCodes;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
@@ -27,9 +24,9 @@ import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -68,7 +65,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
       return Result.fail("请一分钟后再获取验证码");
     }
     // 3.符合，生成验证码
-    String code = RandomUtil.randomNumbers(6);
+    String code = RandomCodes.digits(6);
 
     // 4.保存验证码到 session
     stringRedisTemplate
@@ -117,16 +114,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
     // 7.保存用户信息到 redis中
     // 7.1.随机生成token，作为登录令牌
-    String token = UUID.randomUUID().toString(true);
+    String token = UUID.randomUUID().toString().replace("-", "");
     // 7.2.将User对象转为HashMap存储
-    UserDTO userDTO = BeanUtil.copyProperties(user, UserDTO.class);
-    Map<String, Object> userMap =
-        BeanUtil.beanToMap(
-            userDTO,
-            new HashMap<>(),
-            CopyOptions.create()
-                .setIgnoreNullValue(true)
-                .setFieldValueEditor((fieldName, fieldValue) -> fieldValue.toString()));
+    UserDTO userDTO = UserDTO.from(user);
+    Map<String, String> userMap = userDTO.toRedisHash();
     // 7.3.存储
     String tokenKey = LOGIN_USER_KEY + token;
     stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
@@ -207,7 +198,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     // 1.创建用户
     User user = new User();
     user.setPhone(phone);
-    user.setNickName(SystemConstants.USER_NICK_NAME_PREFIX + RandomUtil.randomString(10));
+    user.setNickName(SystemConstants.USER_NICK_NAME_PREFIX + RandomCodes.lowerAlphanumeric(10));
     // 2.保存用户
     save(user);
     return user;
@@ -226,6 +217,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
   @Override
   public Result queryUserById(Long userId) {
     User user = getById(userId);
-    return user == null ? Result.ok() : Result.ok(BeanUtil.copyProperties(user, UserDTO.class));
+    return user == null ? Result.ok() : Result.ok(UserDTO.from(user));
   }
 }

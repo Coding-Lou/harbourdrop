@@ -1,6 +1,5 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.util.StrUtil;
 import com.hmdp.dto.Result;
 import com.hmdp.mapper.MediaMapper;
 import com.hmdp.reliability.MediaStorage;
@@ -159,18 +158,19 @@ public class MediaServiceImpl implements IMediaService {
 
   private String createNewFileName(String originalFilename) {
     // 获取后缀
-    String suffix = StrUtil.subAfter(originalFilename, ".", true);
+    int dot = originalFilename == null ? -1 : originalFilename.lastIndexOf('.');
+    String suffix = dot < 0 ? "" : originalFilename.substring(dot + 1);
     // 生成目录
     String name = UUID.randomUUID().toString();
     int hash = name.hashCode();
     int d1 = hash & 0xF;
     int d2 = (hash >> 4) & 0xF;
     // 判断目录是否存在
-    File dir = new File(uploadDir, StrUtil.format("/blogs/{}/{}", d1, d2));
+    File dir = new File(uploadDir, String.format("/blogs/%d/%d", d1, d2));
     if (!dir.exists()) {
       dir.mkdirs();
     }
     // 生成文件名
-    return StrUtil.format("/blogs/{}/{}/{}.{}", d1, d2, name, suffix);
+    return String.format("/blogs/%d/%d/%s.%s", d1, d2, name, suffix);
   }
 }

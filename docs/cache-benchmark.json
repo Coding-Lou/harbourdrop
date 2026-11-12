@@ -1,5 +1,5 @@
 {
-  "generated_at" : "2026-11-12T17:37:36.626238Z",
+  "generated_at" : "2026-11-12T18:07:56.995335Z",
   "endpoint" : "GET /shop/1",
   "requests_per_phase" : 10000,
   "concurrency" : 8,
@@ -11,24 +11,24 @@
   "baseline" : {
     "successes" : 10000,
     "errors" : 0,
-    "duration_seconds" : 4.973930333,
-    "qps" : 2010.482521971423,
-    "p50_ms" : 2.585417,
-    "p95_ms" : 9.639292,
-    "p99_ms" : 19.48525,
+    "duration_seconds" : 11.702752083,
+    "qps" : 854.4998585868103,
+    "p50_ms" : 6.607459,
+    "p95_ms" : 25.039583,
+    "p99_ms" : 38.9265,
     "measured_mysql_detail_loads" : 10000.0,
     "cold_request_mysql_detail_loads" : 1.0
   },
   "optimized" : {
     "successes" : 10000,
     "errors" : 0,
-    "duration_seconds" : 1.033247583,
-    "qps" : 9678.222494327383,
-    "p50_ms" : 0.736625,
-    "p95_ms" : 1.391417,
-    "p99_ms" : 2.658958,
+    "duration_seconds" : 1.906180166,
+    "qps" : 5246.093825949504,
+    "p50_ms" : 0.845,
+    "p95_ms" : 4.666708,
+    "p99_ms" : 12.621084,
     "measured_mysql_detail_loads" : 0.0,
     "cold_request_mysql_detail_loads" : 1.0
   },
-  "scope" : "Isolated Docker MySQL 8 / Redis 7 / Memcached 1.6. One Java instance; warm hot-key HTTP test, not a production capacity claim."
+  "scope" : "Testcontainers MySQL 8 / Redis 7. One Java instance; warm hot-key HTTP test, not a production capacity claim."
 }

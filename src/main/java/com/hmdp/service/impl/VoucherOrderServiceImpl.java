@@ -1,6 +1,5 @@
 package com.hmdp.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -15,6 +14,7 @@ import com.hmdp.service.ISeckillService;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.service.IVoucherService;
+import com.hmdp.utils.BeanMaps;
 import com.hmdp.utils.RedisIdWorker;
 import com.hmdp.utils.UserHolder;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -279,7 +279,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     if (order == null || !UserHolder.getUser().getId().equals(order.getUserId())) {
       return Result.fail("订单不存在");
     }
-    Map<String, Object> detail = BeanUtil.beanToMap(order);
+    Map<String, Object> detail = BeanMaps.toMap(order);
     Voucher voucher = voucherService.getById(order.getVoucherId());
     if (voucher != null) {
       detail.put(
