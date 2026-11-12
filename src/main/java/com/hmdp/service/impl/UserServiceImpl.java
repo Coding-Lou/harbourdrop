@@ -2,37 +2,37 @@ package com.hmdp.service.impl;
 
 import static com.hmdp.utils.RedisConstants.LOGIN_CODE_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_CODE_TTL;
-import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
-import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 import static com.hmdp.utils.RedisConstants.USER_SIGN_KEY;
 
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.TokenPairDTO;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
 import com.hmdp.reliability.RateLimiter;
 import com.hmdp.reliability.RedisScripts;
 import com.hmdp.repository.UserRepository;
+import com.hmdp.security.LoginCodeSender;
+import com.hmdp.security.TokenService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RandomCodes;
 import com.hmdp.utils.RegexUtils;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
 /**
@@ -66,39 +66,40 @@ public class UserServiceImpl implements IUserService {
   private static final DefaultRedisScript<Long> CONSUME_CODE =
       RedisScripts.number("consume-code.lua");
 
+  @Resource
+  private TokenService tokenService;
+
+  @Resource
+  private LoginCodeSender loginCodeSender;
+
+  private static String normalizeEmail(String email) {
+    return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+  }
+
   @Override
-  public Result sendCode(String phone, HttpSession session) {
-    // 1.校验手机号
-    if (RegexUtils.isPhoneInvalid(phone)) {
-      // 2.如果不符合，返回错误信息
-      return Result.fail("手机号格式错误！");
+  public Result sendCode(String rawEmail) {
+    String email = normalizeEmail(rawEmail);
+    if (email == null || email.length() > 254 || RegexUtils.isEmailInvalid(email)) {
+      return Result.fail("邮箱格式错误！");
     }
-    if (!rateLimiter.allow("code-phone:" + phone, 1, 60000)) {
+    if (!rateLimiter.allow("code-email:" + email, 1, 60000)) {
       return Result.fail("请一分钟后再获取验证码");
     }
-    // 3.符合，生成验证码
     String code = RandomCodes.digits(6);
-
-    // 4.保存验证码到 session
     stringRedisTemplate
         .opsForValue()
-        .set(LOGIN_CODE_KEY + phone, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
-
-    // 5.发送验证码
-    log.debug("发送短信验证码成功，验证码：{}", code);
-    // 返回ok
+        .set(LOGIN_CODE_KEY + email, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
+    loginCodeSender.send(email, code);
     return Result.ok();
   }
 
   @Override
-  public Result login(LoginFormDTO loginForm, HttpSession session) {
-    // 1.校验手机号
-    String phone = loginForm.getPhone();
-    if (RegexUtils.isPhoneInvalid(phone)) {
-      // 2.如果不符合，返回错误信息
-      return Result.fail("手机号格式错误！");
+  public Result login(LoginFormDTO loginForm) {
+    String email = normalizeEmail(loginForm.getEmail());
+    if (email == null || email.length() > 254 || RegexUtils.isEmailInvalid(email)) {
+      return Result.fail("邮箱格式错误！");
     }
-    if (!rateLimiter.allow("login-phone:" + phone, 5, 120000)) {
+    if (!rateLimiter.allow("login-email:" + email, 5, 120000)) {
       return Result.fail("尝试次数过多，请稍后重试");
     }
     String code = loginForm.getCode();
@@ -107,38 +108,26 @@ public class UserServiceImpl implements IUserService {
         || !Long.valueOf(1)
             .equals(
                 stringRedisTemplate.execute(
-                    CONSUME_CODE, Collections.singletonList(LOGIN_CODE_KEY + phone), code))) {
+                    CONSUME_CODE, Collections.singletonList(LOGIN_CODE_KEY + email), code))) {
       return Result.fail("验证码错误或已使用");
     }
-
-    // 4.一致，根据手机号查询用户 select * from tb_user where phone = ?
-    User user = userRepository.findByPhone(phone);
-
-    // 5.判断用户是否存在
+    User user = userRepository.findByEmail(email);
     if (user == null) {
-      // 6.不存在，创建新用户并保存
       try {
-        user = createUserWithPhone(phone);
+        user = createUserWithEmail(email);
       } catch (DataIntegrityViolationException duplicate) {
-        // A concurrent first login created the same phone; the unique key decides the winner.
-        user = userRepository.findByPhone(phone);
+        // A concurrent first login created the same email; the unique key decides the winner.
+        user = userRepository.findByEmail(email);
       }
     }
+    TokenPairDTO tokens = tokenService.issue(UserDTO.from(user));
+    return Result.ok(tokens);
+  }
 
-    // 7.保存用户信息到 redis中
-    // 7.1.随机生成token，作为登录令牌
-    String token = UUID.randomUUID().toString().replace("-", "");
-    // 7.2.将User对象转为HashMap存储
-    UserDTO userDTO = UserDTO.from(user);
-    Map<String, String> userMap = userDTO.toRedisHash();
-    // 7.3.存储
-    String tokenKey = LOGIN_USER_KEY + token;
-    stringRedisTemplate.opsForHash().putAll(tokenKey, userMap);
-    // 7.4.设置token有效期
-    stringRedisTemplate.expire(tokenKey, LOGIN_USER_TTL, TimeUnit.MINUTES);
-
-    // 8.返回token
-    return Result.ok(token);
+  @Override
+  public Result refresh(String refreshToken) {
+    TokenPairDTO tokens = tokenService.refresh(refreshToken);
+    return tokens == null ? Result.fail("登录已过期，请重新登录") : Result.ok(tokens);
   }
 
   @Override
@@ -207,22 +196,20 @@ public class UserServiceImpl implements IUserService {
     return Result.ok(consecutiveDays);
   }
 
-  private User createUserWithPhone(String phone) {
-    // 1.创建用户
+  private User createUserWithEmail(String email) {
     User user = new User();
-    user.setPhone(phone);
+    user.setEmail(email);
     user.setNickName(SystemConstants.USER_NICK_NAME_PREFIX + RandomCodes.lowerAlphanumeric(10));
-    // 2.保存用户
     userRepository.insert(user);
     return user;
   }
 
   @Override
-  public Result logout(String token) {
-    if (token == null || token.trim().isEmpty()) {
+  public Result logout(Jwt accessToken, String refreshToken) {
+    if (accessToken == null) {
       return Result.fail("缺少登录令牌");
     }
-    stringRedisTemplate.delete(LOGIN_USER_KEY + token);
+    tokenService.revoke(accessToken, refreshToken);
     UserHolder.removeUser();
     return Result.ok();
   }

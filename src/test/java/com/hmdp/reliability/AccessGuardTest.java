@@ -15,8 +15,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.util.ReflectionTestUtils;
 
+/** AccessGuard now only handles URI hygiene and rate limits; auth rules live in SecurityConfig. */
 class AccessGuardTest {
   @AfterEach
   void clear() {
@@ -24,45 +24,8 @@ class AccessGuardTest {
   }
 
   @Test
-  void publicReadsStayOpenButAnonymousAndNonAdminWritesAreRejected() throws Exception {
+  void pathParameterAndEncodingTricksAreRejected() throws Exception {
     AccessGuard guard = new AccessGuard(mock(RateLimiter.class));
-    ReflectionTestUtils.setField(guard, "admins", "1010");
-    assertTrue(
-        guard.preHandle(
-            new MockHttpServletRequest("GET", "/shop/1"),
-            new MockHttpServletResponse(),
-            new Object()));
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(new MockHttpServletRequest("POST", "/shop"), response, new Object()));
-    assertEquals(401, response.getStatus());
-    UserDTO user = new UserDTO();
-    user.setId(1012L);
-    UserHolder.saveUser(user);
-    response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(new MockHttpServletRequest("PUT", "/shop"), response, new Object()));
-    assertEquals(403, response.getStatus());
-    user.setId(1010L);
-    assertTrue(
-        guard.preHandle(
-            new MockHttpServletRequest("PUT", "/shop"),
-            new MockHttpServletResponse(),
-            new Object()));
-    UserHolder.removeUser();
-    response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(
-            new MockHttpServletRequest("DELETE", "/upload/blog"), response, new Object()));
-  }
-
-  @Test
-  void pathParameterAndEncodingTricksCannotBypassAdminChecks() throws Exception {
-    AccessGuard guard = new AccessGuard(mock(RateLimiter.class));
-    ReflectionTestUtils.setField(guard, "admins", "1010");
-    UserDTO user = new UserDTO();
-    user.setId(1012L);
-    UserHolder.saveUser(user);
     String[][] attempts = {
       {"PUT", "/shop;x"},
       {"POST", "/shop;jsessionid=1"},
@@ -79,51 +42,14 @@ class AccessGuardTest {
           attempt[1]);
       assertEquals(400, response.getStatus(), attempt[1]);
     }
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(
-            new MockHttpServletRequest("POST", "/ops/seckill/1/publish"), response, new Object()));
-    assertEquals(403, response.getStatus());
   }
 
   @Test
-  void errorDispatchKeepsTheOriginalStatusInsteadOfAskingForLogin() throws Exception {
+  void errorDispatchKeepsTheOriginalStatus() throws Exception {
     AccessGuard guard = new AccessGuard(mock(RateLimiter.class));
-    MockHttpServletRequest error = new MockHttpServletRequest("GET", "/error");
+    MockHttpServletRequest error = new MockHttpServletRequest("GET", "/error;x");
     error.setDispatcherType(DispatcherType.ERROR);
     assertTrue(guard.preHandle(error, new MockHttpServletResponse(), new Object()));
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(new MockHttpServletRequest("GET", "/error"), response, new Object()));
-    assertEquals(401, response.getStatus());
-  }
-
-  @Test
-  void experienceAllowsBoundedPublicSamplingButKeepsOrderDetailsAndWritesPrivate()
-      throws Exception {
-    RateLimiter limits = mock(RateLimiter.class);
-    when(limits.allow(anyString(), eq(60), eq(60000L))).thenReturn(true);
-    AccessGuard guard = new AccessGuard(limits);
-    assertTrue(
-        guard.preHandle(
-            new MockHttpServletRequest("GET", "/experience/cache"),
-            new MockHttpServletResponse(),
-            new Object()));
-    assertTrue(
-        guard.preHandle(
-            new MockHttpServletRequest("POST", "/experience/visits"),
-            new MockHttpServletResponse(),
-            new Object()));
-    MockHttpServletResponse response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(
-            new MockHttpServletRequest("GET", "/experience/orders/10"), response, new Object()));
-    assertEquals(401, response.getStatus());
-    response = new MockHttpServletResponse();
-    assertFalse(
-        guard.preHandle(
-            new MockHttpServletRequest("POST", "/experience/cache"), response, new Object()));
-    assertEquals(401, response.getStatus());
   }
 
   @Test
@@ -137,17 +63,32 @@ class AccessGuardTest {
   }
 
   @Test
-  void monitoringCredentialOnlyGrantsReadAccessToMetrics() throws Exception {
-    AccessGuard guard = new AccessGuard(mock(RateLimiter.class));
-    ReflectionTestUtils.setField(guard, "monitorToken", "private-test-value");
-    MockHttpServletRequest request = new MockHttpServletRequest("GET", "/actuator/prometheus");
-    request.addHeader("Authorization", "Bearer private-test-value");
-    assertTrue(guard.preHandle(request, new MockHttpServletResponse(), new Object()));
-    request = new MockHttpServletRequest("GET", "/actuator/prometheus");
-    request.addHeader("Authorization", "Bearer wrong");
-    assertFalse(guard.preHandle(request, new MockHttpServletResponse(), new Object()));
-    request = new MockHttpServletRequest("POST", "/shop");
-    request.addHeader("Authorization", "Bearer private-test-value");
-    assertFalse(guard.preHandle(request, new MockHttpServletResponse(), new Object()));
+  void loginEndpointsShareThePerIpLimit() throws Exception {
+    RateLimiter limits = mock(RateLimiter.class);
+    when(limits.allow(anyString(), eq(30), eq(60000L))).thenReturn(false);
+    AccessGuard guard = new AccessGuard(limits);
+    for (String path : new String[] {"/user/code", "/user/login", "/user/refresh"}) {
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      assertFalse(
+          guard.preHandle(new MockHttpServletRequest("POST", path), response, new Object()));
+      assertEquals(429, response.getStatus(), path);
+    }
+  }
+
+  @Test
+  void seckillClaimsAreLimitedPerUser() throws Exception {
+    RateLimiter limits = mock(RateLimiter.class);
+    when(limits.allow("claim-user:7", 10, 1000)).thenReturn(false);
+    AccessGuard guard = new AccessGuard(limits);
+    UserDTO user = new UserDTO();
+    user.setId(7L);
+    UserHolder.saveUser(user);
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    assertFalse(
+        guard.preHandle(
+            new MockHttpServletRequest("POST", "/voucher-order/seckill/9"),
+            response,
+            new Object()));
+    assertEquals(429, response.getStatus());
   }
 }

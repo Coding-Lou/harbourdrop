@@ -19,11 +19,42 @@ const routes = {
   "/experience.html": "experience",
 };
 const page = routes[location.pathname] || "not-found";
+const EMAIL_PATTERN =
+  /^[A-Za-z0-9._%+-]{1,64}@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+
+function storeSession(tokens) {
+  sessionStorage.setItem("token", tokens.accessToken);
+  sessionStorage.setItem("refreshToken", tokens.refreshToken);
+}
+
+function clearSession() {
+  sessionStorage.removeItem("token");
+  sessionStorage.removeItem("refreshToken");
+}
+
 let app;
 const api = createApi({
   tokenProvider: () => sessionStorage.getItem("token"),
+  refreshSession: async () => {
+    const refreshToken = sessionStorage.getItem("refreshToken");
+    if (!refreshToken) {
+      return false;
+    }
+    const response = await fetch("/api/user/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ refreshToken }),
+    });
+    const result = response.ok ? await response.json() : null;
+    if (!result || !result.success) {
+      return false;
+    }
+    storeSession(result.data);
+    return true;
+  },
   onUnauthorized: (quiet) => {
-    sessionStorage.removeItem("token");
+    clearSession();
     if (app) {
       app.user = null;
     }
@@ -90,7 +121,7 @@ app = new Vue({
     orderLoading: false,
     pendingRequest: null,
     requestMessage: "",
-    phone: "",
+    email: "",
     code: "",
     loginBusy: false,
     codeBusy: false,
@@ -662,14 +693,18 @@ app = new Vue({
     },
     async logout() {
       try {
-        await api("/user/logout", { method: "POST", quiet: true });
+        await api("/user/logout", {
+          method: "POST",
+          quiet: true,
+          body: { refreshToken: sessionStorage.getItem("refreshToken") },
+        });
       } catch (error) {
         if (error.status !== 401) {
           this.showError(error);
           return;
         }
       }
-      sessionStorage.removeItem("token");
+      clearSession();
       location.assign("/");
     },
     async loadOrders() {
@@ -746,8 +781,8 @@ app = new Vue({
     },
     async sendCode() {
       this.loginError = "";
-      if (!/^1[3-9]\d{9}$/.test(this.phone.trim())) {
-        this.loginError = "请输入正确的 11 位手机号码";
+      if (!EMAIL_PATTERN.test(this.email.trim())) {
+        this.loginError = "请输入正确的邮箱地址";
         return;
       }
       if (this.codeBusy || this.codeCountdown) {
@@ -757,7 +792,7 @@ app = new Vue({
       try {
         await api("/user/code", {
           method: "POST",
-          params: { phone: this.phone.trim() },
+          params: { email: this.email.trim() },
         });
         this.codeCountdown = 60;
         this.codeTimer = setInterval(() => {
@@ -766,7 +801,7 @@ app = new Vue({
             clearInterval(this.codeTimer);
           }
         }, 1000);
-        this.notify("验证码已生成，请使用当前演示环境提供的验证码");
+        this.notify("验证码已发送到邮箱，本地环境可在 Mailpit（127.0.0.1:8025）查看");
       } catch (error) {
         this.loginError = error.message;
       } finally {
@@ -775,10 +810,10 @@ app = new Vue({
     },
     async login() {
       if (
-        !/^1[3-9]\d{9}$/.test(this.phone.trim()) ||
+        !EMAIL_PATTERN.test(this.email.trim()) ||
         !/^\d{6}$/.test(this.code.trim())
       ) {
-        this.loginError = "请填写正确的手机号和 6 位验证码";
+        this.loginError = "请填写正确的邮箱和 6 位验证码";
         return;
       }
       this.loginBusy = true;
@@ -786,9 +821,9 @@ app = new Vue({
       try {
         const result = await api("/user/login", {
           method: "POST",
-          body: { phone: this.phone.trim(), code: this.code.trim() },
+          body: { email: this.email.trim(), code: this.code.trim() },
         });
-        sessionStorage.setItem("token", String(result.data));
+        storeSession(result.data);
         location.assign(safeReturn(query.get("return"), location.origin));
       } catch (error) {
         this.loginError = error.message;

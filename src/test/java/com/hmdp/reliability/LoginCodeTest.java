@@ -18,11 +18,11 @@ class LoginCodeTest {
     StringRedisTemplate redis = mock(StringRedisTemplate.class);
     ReflectionTestUtils.setField(service, "rateLimiter", limiter);
     ReflectionTestUtils.setField(service, "stringRedisTemplate", redis);
-    assertFalse(service.sendCode("13800000000", null).getSuccess());
+    assertFalse(service.sendCode("someone@example.com").getSuccess());
     LoginFormDTO form = new LoginFormDTO();
-    form.setPhone("13800000000");
+    form.setEmail("someone@example.com");
     form.setCode("123456");
-    assertFalse(service.login(form, null).getSuccess());
+    assertFalse(service.login(form).getSuccess());
     verifyNoInteractions(redis);
   }
 }

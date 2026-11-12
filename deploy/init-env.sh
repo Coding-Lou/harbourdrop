@@ -15,6 +15,7 @@ set -C
   printf 'HMDP_MYSQL_PASSWORD=%s\n' "$(openssl rand -hex 24)"
   printf 'HMDP_REDIS_PASSWORD=%s\n' "$(openssl rand -hex 24)"
   printf 'HMDP_MONITOR_TOKEN=%s\n' "$(openssl rand -hex 24)"
+  printf 'HMDP_JWT_SECRET=%s\n' "$(openssl rand -hex 32)"
   printf 'HMDP_ADMIN_IDS=\nHMDP_PAYMENT_MOCK_ENABLED=false\n'
 } > .env
 printf '%s\n' 'Created private .env. Keep it with the persistent database volumes.'

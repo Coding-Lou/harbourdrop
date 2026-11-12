@@ -233,18 +233,23 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
         401,
         http.exchange("/ops/seckill/tasks", HttpMethod.GET, new HttpEntity<>(headers), String.class)
             .getStatusCodeValue());
-    redis.opsForHash().put("login:token:test-monitor-admin", "id", "1010");
-    redis.expire("login:token:test-monitor-admin", 1, TimeUnit.MINUTES);
-    try {
-      headers.set("Authorization", "test-monitor-admin");
-      assertEquals(
-          200,
-          http.exchange(
-                  "/actuator/prometheus", HttpMethod.GET, new HttpEntity<>(headers), String.class)
-              .getStatusCodeValue());
-    } finally {
-      redis.delete("login:token:test-monitor-admin");
-    }
+    // An administrator's own login may read metrics too; a regular user may not.
+    assertEquals(
+        200,
+        http.exchange(
+                "/actuator/prometheus",
+                HttpMethod.GET,
+                new HttpEntity<>(bearer(1010)),
+                String.class)
+            .getStatusCodeValue());
+    assertEquals(
+        403,
+        http.exchange(
+                "/actuator/prometheus",
+                HttpMethod.GET,
+                new HttpEntity<>(bearer(1012)),
+                String.class)
+            .getStatusCodeValue());
     assertEquals(200, http.getForEntity("/actuator/health", String.class).getStatusCodeValue());
   }
 

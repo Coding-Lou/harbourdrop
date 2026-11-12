@@ -61,11 +61,27 @@ export function createApi({
   fetchImpl = fetch,
   tokenProvider,
   onUnauthorized,
+  refreshSession,
   timeout = 10000,
 }) {
+  // One shared refresh for concurrent 401s; refresh tokens are single-use.
+  let refreshing = null;
+  function renew() {
+    if (!refreshSession) {
+      return Promise.resolve(false);
+    }
+    refreshing ||= Promise.resolve()
+      .then(refreshSession)
+      .catch(() => false)
+      .finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
+  }
   return async function request(
     path,
     { method = "GET", params, body, quiet = false } = {},
+    retried = false,
   ) {
     const query = new URLSearchParams();
     Object.entries(params || {}).forEach(([key, value]) => {
@@ -77,7 +93,7 @@ export function createApi({
     const headers = { Accept: "application/json" };
     const token = tokenProvider();
     if (token) {
-      headers.authorization = token;
+      headers.Authorization = "Bearer " + token;
     }
     const multipart =
       typeof FormData !== "undefined" && body instanceof FormData;
@@ -96,6 +112,10 @@ export function createApi({
           body == null ? undefined : multipart ? body : JSON.stringify(body),
       });
       if (response.status === 401) {
+        // An expired access token is renewed once with the refresh token, then retried.
+        if (token && !retried && (await renew())) {
+          return request(path, { method, params, body, quiet }, true);
+        }
         onUnauthorized(quiet);
         throw new ApiError("登录已过期，请重新登录", 401);
       }

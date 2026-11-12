@@ -76,8 +76,54 @@ test("requests encode Chinese searches and retain zero/false values and fresh au
   assert.equal(url.searchParams.get("keyword"), "茶餐厅 & 咖啡");
   assert.equal(url.searchParams.get("page"), "0");
   assert.equal(url.searchParams.get("liked"), "false");
-  assert.equal(requests[0].options.headers.authorization, "first-token");
-  assert.equal(requests[1].options.headers.authorization, "second-token");
+  assert.equal(requests[0].options.headers.Authorization, "Bearer first-token");
+  assert.equal(requests[1].options.headers.Authorization, "Bearer second-token");
+});
+
+test("an expired access token is refreshed once and the request retried", async () => {
+  let token = "expired";
+  let refreshes = 0;
+  const seen = [];
+  const request = createApi({
+    tokenProvider: () => token,
+    onUnauthorized() {
+      assert.fail("a successful refresh must not log the user out");
+    },
+    refreshSession: async () => {
+      refreshes += 1;
+      token = "renewed";
+      return true;
+    },
+    fetchImpl: async (url, options) => {
+      seen.push(options.headers.Authorization);
+      return options.headers.Authorization === "Bearer renewed"
+        ? new Response('{"success":true,"data":1}')
+        : new Response("", { status: 401 });
+    },
+  });
+  // Two concurrent 401s share one refresh, because refresh tokens are single-use.
+  const [first, second] = await Promise.all([
+    request("/user/me"),
+    request("/user/me"),
+  ]);
+  assert.equal(first.data, 1);
+  assert.equal(second.data, 1);
+  assert.equal(refreshes, 1);
+  assert.deepEqual(seen.slice(0, 2), ["Bearer expired", "Bearer expired"]);
+});
+
+test("a failed refresh falls back to logging out", async () => {
+  let loggedOut = false;
+  const request = createApi({
+    tokenProvider: () => "expired",
+    onUnauthorized() {
+      loggedOut = true;
+    },
+    refreshSession: async () => false,
+    fetchImpl: async () => new Response("", { status: 401 }),
+  });
+  await assert.rejects(request("/user/me"), (error) => error.status === 401);
+  assert.equal(loggedOut, true);
 });
 
 test("business rejection retains its actual message and differs from an uncertain network failure", async () => {

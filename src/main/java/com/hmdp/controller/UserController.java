@@ -1,19 +1,20 @@
 package com.hmdp.controller;
 
 import com.hmdp.dto.LoginFormDTO;
+import com.hmdp.dto.RefreshTokenDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.service.IUserInfoService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
-import jakarta.servlet.http.HttpSession;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,32 +35,30 @@ public class UserController {
   @Resource
   private IUserInfoService userInfoService;
 
-  /** 发送手机验证码 */
+  /** 发送邮箱验证码（一次性，2 分钟有效）。 */
   @PostMapping("code")
-  public Result sendCode(@RequestParam("phone") String phone, HttpSession session) {
-    // 发送短信验证码并保存验证码
-    return userService.sendCode(phone, session);
+  public Result sendCode(@RequestParam("email") String email) {
+    return userService.sendCode(email);
   }
 
-  /**
-   * 登录功能
-   *
-   * @param loginForm 登录参数，包含手机号、验证码；或者手机号、密码
-   */
+  /** 邮箱验证码登录；首次登录自动注册。返回 access token（JWT）与一次性 refresh token。 */
   @PostMapping("/login")
-  public Result login(@RequestBody LoginFormDTO loginForm, HttpSession session) {
-    // 实现登录功能
-    return userService.login(loginForm, session);
+  public Result login(@RequestBody LoginFormDTO loginForm) {
+    return userService.login(loginForm);
   }
 
-  /**
-   * 登出功能
-   *
-   * @return 无
-   */
+  /** 用 refresh token 换取新的令牌对；旧 refresh token 随即失效。 */
+  @PostMapping("/refresh")
+  public Result refresh(@RequestBody RefreshTokenDTO request) {
+    return userService.refresh(request == null ? null : request.getRefreshToken());
+  }
+
+  /** 吊销当前 access token 与（可选）refresh token。 */
   @PostMapping("/logout")
-  public Result logout(@RequestHeader(value = "authorization", required = false) String token) {
-    return userService.logout(token);
+  public Result logout(
+      @AuthenticationPrincipal Jwt accessToken,
+      @RequestBody(required = false) RefreshTokenDTO request) {
+    return userService.logout(accessToken, request == null ? null : request.getRefreshToken());
   }
 
   @GetMapping("/me")

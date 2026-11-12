@@ -613,21 +613,18 @@
             <section class="login-panel">
               <span class="eyebrow">很高兴，又见到你</span>
               <h2>欢迎来到黑马点评</h2>
-              <p class="muted">使用手机号与验证码登录</p>
+              <p class="muted">使用邮箱与验证码登录，首次登录自动注册</p>
               <form @submit.prevent="login">
-                <label for="phone">手机号码</label>
-                <div class="input-with-prefix">
-                  <span>+86</span
-                  ><input
-                    id="phone"
-                    v-model="phone"
-                    type="tel"
-                    maxlength="11"
-                    autocomplete="tel-national"
-                    placeholder="请输入手机号码"
-                    required
-                  />
-                </div>
+                <label for="email">邮箱</label>
+                <input
+                  id="email"
+                  v-model="email"
+                  type="email"
+                  maxlength="254"
+                  autocomplete="email"
+                  placeholder="you@example.com"
+                  required
+                />
                 <label for="code">验证码</label>
                 <div class="code-input">
                   <input

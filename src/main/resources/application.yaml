@@ -96,6 +96,16 @@ hmdp:
     relay-batch-size: 20
     send-timeout-ms: 10000
   monitor-token: ${HMDP_MONITOR_TOKEN:}
+  security:
+    # HS256 key, at least 32 bytes. The default only exists so a fresh clone runs locally;
+    # every shared or deployed environment must set HMDP_JWT_SECRET.
+    jwt-secret: ${HMDP_JWT_SECRET:local-development-only-jwt-secret-change-me}
+    access-token-ttl: ${HMDP_ACCESS_TOKEN_TTL:15m}
+    refresh-token-ttl: ${HMDP_REFRESH_TOKEN_TTL:7d}
+  mail:
+    # Login codes are emailed when enabled (SMTP from SPRING_MAIL_HOST/PORT, e.g. Mailpit).
+    enabled: ${HMDP_MAIL_ENABLED:false}
+    from: ${HMDP_MAIL_FROM:no-reply@hmdp.local}
   cache:
     enabled: true
   cdc:

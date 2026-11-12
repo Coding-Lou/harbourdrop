@@ -3,9 +3,9 @@ package com.hmdp.service;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.User;
-import jakarta.servlet.http.HttpSession;
 import java.util.Collection;
 import java.util.List;
+import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
  * 服务类
@@ -18,15 +18,17 @@ public interface IUserService {
 
   List<User> listByIds(Collection<Long> ids);
 
-  Result sendCode(String phone, HttpSession session);
+  Result sendCode(String email);
 
-  Result login(LoginFormDTO loginForm, HttpSession session);
+  Result login(LoginFormDTO loginForm);
+
+  Result refresh(String refreshToken);
 
   Result signInToday();
 
   Result queryCurrentMonthConsecutiveSignInDays();
 
-  Result logout(String token);
+  Result logout(Jwt accessToken, String refreshToken);
 
   Result queryUserById(Long userId);
 }

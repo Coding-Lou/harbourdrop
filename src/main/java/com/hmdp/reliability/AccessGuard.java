@@ -3,16 +3,13 @@ package com.hmdp.reliability;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.UserDTO;
 import com.hmdp.service.IOperationAuditService;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.util.Arrays;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.util.UrlPathHelper;
@@ -27,93 +24,49 @@ public class AccessGuard implements HandlerInterceptor {
 
   private final RateLimiter limits;
 
-  @Value("${citylens.catalog-admin-ids:}")
-  private String admins;
-
-  @Value("${hmdp.monitor-token:}")
-  private String monitorToken;
-
   public AccessGuard(RateLimiter limits) {
     this.limits = limits;
   }
 
-  public boolean isAdmin() {
-    return UserHolder.getUser() != null
-        && Arrays.stream(admins.split(","))
-            .map(String::trim)
-            .anyMatch(id -> id.equals(UserHolder.getUser().getId().toString()));
-  }
-
+  /**
+   * Rate limits and request hygiene. Authentication and role checks run earlier, in the Spring
+   * Security filter chain ({@code SecurityConfig}); by the time this interceptor runs, protected
+   * routes already have an authenticated {@link UserHolder} user.
+   */
   @Override
   public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object handler)
       throws Exception {
-    // The original request was already checked; let the error page render its real status
-    // instead of turning every anonymous 404/500 into a misleading 401.
+    // The original request was already checked; let the error page render its real status.
     if (req.getDispatcherType() == DispatcherType.ERROR) {
       return true;
     }
-    // Spring MVC strips ";params" and decodes "%xx" before routing, so prefix checks on the raw
-    // URI could be bypassed (e.g. "/ops;x/..."). Reject ambiguous URIs, then match the same
-    // normalized lookup path that the handler mapping uses.
+    // Defense in depth next to the Security firewall: reject URIs whose raw form differs from the
+    // path used for routing (";params", "%xx", "//", dot segments).
     if (isAmbiguousUri(req.getRequestURI())) {
       return reject(res, 400, "请求路径无效");
     }
     String path = UrlPathHelper.defaultInstance.getLookupPathForRequest(req);
-    String method = req.getMethod();
-    if (path.equals("/actuator/prometheus")
-        && "GET".equals(method)
-        && monitorToken != null
-        && !monitorToken.isEmpty()) {
-      String authorization = req.getHeader("Authorization");
-      if (authorization != null
-          && MessageDigest.isEqual(
-              ("Bearer " + monitorToken).getBytes(StandardCharsets.UTF_8),
-              authorization.getBytes(StandardCharsets.UTF_8))) {
-        return true;
-      }
-    }
-    boolean read = "GET".equals(method) || "HEAD".equals(method);
-    boolean experiencePublic =
-        (read
-                && (path.equals("/experience/capabilities")
-                    || path.equals("/experience/cache")
-                    || path.equals("/experience/visits")))
-            || ("POST".equals(method) && path.equals("/experience/visits"));
+    boolean read = "GET".equals(req.getMethod()) || "HEAD".equals(req.getMethod());
     if (path.startsWith("/experience/")
         && !limits.allow("experience-ip:" + req.getRemoteAddr(), 60, 60000)) {
       return reject(res, 429, "体验请求较多，请稍后重试");
     }
-    boolean publicRead =
-        read
-            && (path.startsWith("/shop/")
-                || path.startsWith("/shop-type/")
-                || path.startsWith("/voucher/")
-                || path.equals("/blog/hot")
-                || path.equals("/blog/of/shop")
-                || path.equals("/blog/search")
-                || path.equals("/actuator/health"));
-    boolean login = path.equals("/user/code") || path.equals("/user/login");
-    if (!publicRead && !experiencePublic && !login && UserHolder.getUser() == null) {
-      return reject(res, 401, "请先登录");
-    }
-    if ((path.startsWith("/ops/")
-            || path.equals("/actuator/prometheus")
-            || (!read && (path.equals("/shop") || path.startsWith("/shop/"))))
-        && !isAdmin()) {
-      return reject(res, 403, "当前账号没有管理权限");
-    }
+    boolean login =
+        path.equals("/user/code") || path.equals("/user/login") || path.equals("/user/refresh");
     if (login && !limits.allow("auth-ip:" + req.getRemoteAddr(), 30, 60000)) {
       return reject(res, 429, "请求过于频繁");
     }
-    if (path.startsWith("/voucher-order/seckill/") && !read) {
-      if (!limits.allow("claim-user:" + UserHolder.getUser().getId(), 10, 1000)
+    UserDTO user = UserHolder.getUser();
+    if (user != null && path.startsWith("/voucher-order/seckill/") && !read) {
+      if (!limits.allow("claim-user:" + user.getId(), 10, 1000)
           || !limits.allow("claim-global", 1000, 1000)) {
         return reject(res, 429, "抢购繁忙，请稍后重试");
       }
     }
-    if (read
+    if (user != null
+        && read
         && path.startsWith("/voucher-order/")
-        && !limits.allow("order-read:" + UserHolder.getUser().getId(), 30, 1000)) {
+        && !limits.allow("order-read:" + user.getId(), 30, 1000)) {
       return reject(res, 429, "查询过于频繁");
     }
     return true;

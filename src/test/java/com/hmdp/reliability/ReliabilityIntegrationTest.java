@@ -352,12 +352,7 @@ class ReliabilityIntegrationTest extends IntegrationTestBase {
     long id = ((Number) result.getData()).longValue();
     assertTrue(coordinator.queryReservationStatus(id, 25001).getSuccess());
     assertFalse(coordinator.queryReservationStatus(id, 25002).getSuccess());
-    Map<String, String> identity = new HashMap<>();
-    identity.put("id", "1012");
-    identity.put("nickName", "test");
-    redis.opsForHash().putAll("login:token:isolation-non-admin", identity);
-    HttpHeaders headers = new HttpHeaders();
-    headers.set("authorization", "isolation-non-admin");
+    HttpHeaders headers = bearer(1012);
     ResponseEntity<String> forbidden =
         http.exchange("/shop", HttpMethod.PUT, new HttpEntity<>(new Shop(), headers), String.class);
     assertEquals(403, forbidden.getStatusCodeValue());
@@ -598,9 +593,7 @@ class ReliabilityIntegrationTest extends IntegrationTestBase {
               uploads
                   .uploadImage(new MockMultipartFile("file", "unused.png", "image/png", png))
                   .getData();
-      HttpHeaders headers = new HttpHeaders();
-      headers.set("authorization", "default-ui-owner");
-      redis.opsForHash().put("login:token:default-ui-owner", "id", "1010");
+      HttpHeaders headers = bearer(1010);
       String response =
           http.exchange(
                   "/upload/blog/delete?name=/imgs" + unused,

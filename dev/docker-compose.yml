@@ -120,6 +120,11 @@ services:
     depends_on:
       connect:
         condition: service_healthy
+  mailpit:
+    # Local SMTP sink for login codes; open http://127.0.0.1:8025 to read them.
+    image: axllent/mailpit:v1.21
+    ports:
+      - '127.0.0.1:${HMDP_MAIL_UI_PORT:-8025}:8025'
   java:
     image: maven:3.9-eclipse-temurin-21
     working_dir: /workspace
@@ -139,6 +144,10 @@ services:
       HMDP_EXPERIENCE_ENABLED: ${HMDP_EXPERIENCE_ENABLED:-true}
       HMDP_KAFKA_SERVERS: kafka:9092
       HMDP_MONITOR_TOKEN: ${HMDP_MONITOR_TOKEN:-hmdp_dev_metrics}
+      HMDP_JWT_SECRET: ${HMDP_JWT_SECRET:-local-development-only-jwt-secret-change-me}
+      HMDP_MAIL_ENABLED: 'true'
+      SPRING_MAIL_HOST: mailpit
+      SPRING_MAIL_PORT: '1025'
       HMDP_UPLOAD_DIR: /uploads
       CITYLENS_CATALOG_ADMIN_IDS: ${HMDP_ADMIN_IDS:-}
       CITYLENS_PAYMENT_MOCK_ENABLED: ${HMDP_PAYMENT_MOCK_ENABLED:-false}
@@ -157,6 +166,8 @@ services:
         condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
+      mailpit:
+        condition: service_started
   web:
     image: nginx:alpine
     ports:

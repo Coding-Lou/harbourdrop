@@ -1,6 +1,5 @@
 package com.hmdp.experience;
 
-import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -13,10 +12,6 @@ import com.hmdp.repository.MessageRepository;
 import com.hmdp.repository.VoucherRepository;
 import com.hmdp.support.IntegrationTestBase;
 import java.sql.Connection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -115,53 +110,39 @@ class ExperienceIntegrationTest extends IntegrationTestBase {
     long sku = fixture.getId();
     String owner = session(918102L);
     String other = session(918103L);
-    try {
-      String submitted =
-          http.exchange(
-                  "/voucher-order/ordinary/" + sku,
-                  HttpMethod.POST,
-                  authorized(owner),
-                  String.class)
-              .getBody();
-      JsonNode created = json.readTree(submitted);
-      assertTrue(created.path("success").asBoolean(), submitted);
-      long orderId = created.path("data").asLong();
-      String path = "/experience/orders/" + orderId;
-      JsonNode progress =
-          json.readTree(
-              http.exchange(path, HttpMethod.GET, authorized(owner), String.class).getBody());
-      assertTrue(progress.path("success").asBoolean());
-      assertTrue(progress.path("data").size() > 0);
-      assertFalse(progress.toString().contains("payload"));
-      boolean createdEvent = false;
-      for (JsonNode row : progress.path("data")) {
-        createdEvent |= "ORDER_CREATED".equals(row.path("kind").asText());
-      }
-      assertTrue(createdEvent);
-      JsonNode denied =
-          json.readTree(
-              http.exchange(path, HttpMethod.GET, authorized(other), String.class).getBody());
-      assertFalse(denied.path("success").asBoolean());
-      assertTrue(messages.selectOrderProgress(orderId, 918103L).isEmpty());
-    } finally {
-      redis.delete(LOGIN_USER_KEY + owner);
-      redis.delete(LOGIN_USER_KEY + other);
+    String submitted =
+        http.exchange(
+                "/voucher-order/ordinary/" + sku, HttpMethod.POST, authorized(owner), String.class)
+            .getBody();
+    JsonNode created = json.readTree(submitted);
+    assertTrue(created.path("success").asBoolean(), submitted);
+    long orderId = created.path("data").asLong();
+    String path = "/experience/orders/" + orderId;
+    JsonNode progress =
+        json.readTree(
+            http.exchange(path, HttpMethod.GET, authorized(owner), String.class).getBody());
+    assertTrue(progress.path("success").asBoolean());
+    assertTrue(progress.path("data").size() > 0);
+    assertFalse(progress.toString().contains("payload"));
+    boolean createdEvent = false;
+    for (JsonNode row : progress.path("data")) {
+      createdEvent |= "ORDER_CREATED".equals(row.path("kind").asText());
     }
+    assertTrue(createdEvent);
+    JsonNode denied =
+        json.readTree(
+            http.exchange(path, HttpMethod.GET, authorized(other), String.class).getBody());
+    assertFalse(denied.path("success").asBoolean());
+    assertTrue(messages.selectOrderProgress(orderId, 918103L).isEmpty());
   }
 
   private String session(long userId) {
-    String token = UUID.randomUUID().toString();
-    Map<String, String> user = new HashMap<>();
-    user.put("id", String.valueOf(userId));
-    user.put("nickName", "isolated-test");
-    redis.opsForHash().putAll(LOGIN_USER_KEY + token, user);
-    redis.expire(LOGIN_USER_KEY + token, 5, TimeUnit.MINUTES);
-    return token;
+    return accessToken(userId);
   }
 
   private HttpEntity<Void> authorized(String token) {
     HttpHeaders headers = new HttpHeaders();
-    headers.set("Authorization", token);
+    headers.setBearerAuth(token);
     return new HttpEntity<>(headers);
   }
 }

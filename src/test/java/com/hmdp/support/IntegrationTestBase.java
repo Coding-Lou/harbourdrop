@@ -1,5 +1,7 @@
 package com.hmdp.support;
 
+import com.hmdp.dto.UserDTO;
+import com.hmdp.security.TokenService;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
@@ -8,8 +10,10 @@ import org.apache.kafka.clients.admin.Admin;
 import org.apache.kafka.clients.admin.AdminClientConfig;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.common.errors.TopicExistsException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.http.HttpHeaders;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -73,6 +77,23 @@ public abstract class IntegrationTestBase {
   static {
     Startables.deepStart(MYSQL, REDIS, KAFKA).join();
     createTopics(List.of(new NewTopic(BEHAVIOR_TOPIC, 3, (short) 1)));
+  }
+
+  @Autowired(required = false)
+  protected TokenService tokenService;
+
+  /** A real signed access token for {@code userId}, as returned by {@code POST /user/login}. */
+  protected String accessToken(long userId) {
+    UserDTO user = new UserDTO();
+    user.setId(userId);
+    user.setNickName("isolated-test");
+    return tokenService.issue(user).accessToken();
+  }
+
+  protected HttpHeaders bearer(long userId) {
+    HttpHeaders headers = new HttpHeaders();
+    headers.setBearerAuth(accessToken(userId));
+    return headers;
   }
 
   @DynamicPropertySource

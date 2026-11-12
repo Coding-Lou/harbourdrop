@@ -36,6 +36,9 @@ public class User implements Serializable {
   /** 手机号码 */
   private String phone;
 
+  /** Login identity, stored lowercase. */
+  private String email;
+
   /** 密码，加密存储 */
   private String password;
 
