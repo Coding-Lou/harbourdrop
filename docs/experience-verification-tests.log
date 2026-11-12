@@ -1,0 +1,29 @@
+[INFO] You have 0 Checkstyle violations.
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.514 s - in com.hmdp.experience.ExperienceServiceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.952 s - in com.hmdp.experience.ExperienceIntegrationTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.784 s - in com.hmdp.cache.CacheLayersIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.062 s - in com.hmdp.cache.CanalBatchTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.hmdp.cache.RequestCacheScopeTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.256 s - in com.hmdp.cache.CacheBenchmarkIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.035 s - in com.hmdp.cache.CacheChangeProjectorTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.cache.CacheReadTraceTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.881 s - in com.hmdp.cache.CacheCdcIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.06 s - in com.hmdp.UserLogoutTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.ShopCacheCompatibilityTest
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.653 s - in com.hmdp.reliability.ReliabilityIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.024 s - in com.hmdp.reliability.SeckillMessageTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.004 s - in com.hmdp.reliability.LoginCodeTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.041 s - in com.hmdp.reliability.CacheConcurrencyTest
+[INFO] Tests run: 4, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.002 s - in com.hmdp.reliability.AccessGuardTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.264 s - in com.hmdp.MapperArchitectureTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.354 s - in com.hmdp.VoucherOrderReliabilityTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.003 s - in com.hmdp.MockPaymentTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.ShopSearchBoundaryTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.963 s - in com.hmdp.messaging.MessagingIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 13.098 s - in com.hmdp.messaging.RocketMqIntegrationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.052 s - in com.hmdp.analytics.KafkaBehaviorIntegrationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.88 s - in com.hmdp.analytics.BehaviorAggregationIntegrationTest
+[INFO] Tests run: 90, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  01:05 min
+[INFO] Finished at: 2026-10-10T15:13:08Z

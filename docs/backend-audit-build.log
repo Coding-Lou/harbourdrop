@@ -1,0 +1,58 @@
+ Container hmdp-optimization-test-test-run-d23e4cd7a017 Creating 
+ Container hmdp-optimization-test-test-run-d23e4cd7a017 Created 
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] ------------------------< com.hmdp:hm-dianping >------------------------
+[INFO] Building hm-dianping 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[WARNING] Parameter 'encoding' is unknown for plugin 'maven-checkstyle-plugin:3.3.1:check (java-style)'
+[INFO] 
+[INFO] --- checkstyle:3.3.1:check (java-style) @ hm-dianping ---
+[INFO] Starting audit...
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:143:13: 'businessOutboxMapper' has incorrect indentation level 12, expected level should be 14. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:160:17: 'OutboxRelayServiceImpl' has incorrect indentation level 16, expected level should be 18. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:169:11: 'group' has incorrect indentation level 10, expected level should be 12. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:170:11: 'key' has incorrect indentation level 10, expected level should be 12. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:171:11: 'valid' has incorrect indentation level 10, expected level should be 12. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:172:11: 'brokerId' has incorrect indentation level 10, expected level should be 12. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:173:11: 'payload' has incorrect indentation level 10, expected level should be 12. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:174:11: 'OutboxRelayServiceImpl' has incorrect indentation level 10, expected level should be 12. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:180:13: 'OutboxRelayServiceImpl' has incorrect indentation level 12, expected level should be 14. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:181:13: '>' has incorrect indentation level 12, expected level should be 14. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:183:15: '"mq:outbox:"' has incorrect indentation level 14, expected level should be 16. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:184:15: 'event' has incorrect indentation level 14, expected level should be 16. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:185:15: 'payload' has incorrect indentation level 14, expected level should be 16. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:186:15: 'OutboxRelayServiceImpl' has incorrect indentation level 14, expected level should be 16. [Indentation]
+[ERROR] /workspace/src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:191:11: 'method call' child has incorrect indentation level 10, expected level should be one of the following: 12, 14, 16. [Indentation]
+Audit done.
+[INFO] There are 15 errors reported by Checkstyle 8.45.1 with config/checkstyle/checkstyle.xml ruleset.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[143,13] (indentation) Indentation: 'businessOutboxMapper' has incorrect indentation level 12, expected level should be 14.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[160,17] (indentation) Indentation: 'OutboxRelayServiceImpl' has incorrect indentation level 16, expected level should be 18.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[169,11] (indentation) Indentation: 'group' has incorrect indentation level 10, expected level should be 12.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[170,11] (indentation) Indentation: 'key' has incorrect indentation level 10, expected level should be 12.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[171,11] (indentation) Indentation: 'valid' has incorrect indentation level 10, expected level should be 12.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[172,11] (indentation) Indentation: 'brokerId' has incorrect indentation level 10, expected level should be 12.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[173,11] (indentation) Indentation: 'payload' has incorrect indentation level 10, expected level should be 12.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[174,11] (indentation) Indentation: 'OutboxRelayServiceImpl' has incorrect indentation level 10, expected level should be 12.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[180,13] (indentation) Indentation: 'OutboxRelayServiceImpl' has incorrect indentation level 12, expected level should be 14.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[181,13] (indentation) Indentation: '>' has incorrect indentation level 12, expected level should be 14.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[183,15] (indentation) Indentation: '"mq:outbox:"' has incorrect indentation level 14, expected level should be 16.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[184,15] (indentation) Indentation: 'event' has incorrect indentation level 14, expected level should be 16.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[185,15] (indentation) Indentation: 'payload' has incorrect indentation level 14, expected level should be 16.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[186,15] (indentation) Indentation: 'OutboxRelayServiceImpl' has incorrect indentation level 14, expected level should be 16.
+[ERROR] src/main/java/com/hmdp/service/impl/BusinessEventServiceImpl.java:[191,11] (indentation) Indentation: 'method call' child has incorrect indentation level 10, expected level should be one of the following: 12, 14, 16.
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD FAILURE
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  0.998 s
+[INFO] Finished at: 2026-10-10T14:45:55Z
+[INFO] ------------------------------------------------------------------------
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-checkstyle-plugin:3.3.1:check (java-style) on project hm-dianping: You have 15 Checkstyle violations. -> [Help 1]
+[ERROR] 
+[ERROR] To see the full stack trace of the errors, re-run Maven with the -e switch.
+[ERROR] Re-run Maven using the -X switch to enable full debug logging.
+[ERROR] 
+[ERROR] For more information about the errors and possible solutions, please read the following articles:
+[ERROR] [Help 1] http://cwiki.apache.org/confluence/display/MAVEN/MojoFailureException
+

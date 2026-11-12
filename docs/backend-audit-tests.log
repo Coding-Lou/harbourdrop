@@ -1,0 +1,48 @@
+[INFO] Compiling 129 source files with javac [debug parameters release 8] to target/classes
+[INFO] Compiling 24 source files with javac [debug parameters release 8] to target/test-classes
+[INFO] Running com.hmdp.cache.CacheLayersIntegrationTest
+[INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 8.053 s - in com.hmdp.cache.CacheLayersIntegrationTest
+[INFO] Running com.hmdp.cache.CanalBatchTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.387 s - in com.hmdp.cache.CanalBatchTest
+[INFO] Running com.hmdp.cache.RequestCacheScopeTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.006 s - in com.hmdp.cache.RequestCacheScopeTest
+[INFO] Running com.hmdp.cache.CacheBenchmarkIntegrationTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.711 s - in com.hmdp.cache.CacheBenchmarkIntegrationTest
+[INFO] Running com.hmdp.cache.CacheChangeProjectorTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.106 s - in com.hmdp.cache.CacheChangeProjectorTest
+[INFO] Running com.hmdp.cache.CacheCdcIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 11.752 s - in com.hmdp.cache.CacheCdcIntegrationTest
+[INFO] Running com.hmdp.UserLogoutTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.086 s - in com.hmdp.UserLogoutTest
+[INFO] Running com.hmdp.ShopCacheCompatibilityTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.ShopCacheCompatibilityTest
+[INFO] Running com.hmdp.reliability.ReliabilityIntegrationTest
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 3.759 s - in com.hmdp.reliability.ReliabilityIntegrationTest
+[INFO] Running com.hmdp.reliability.SeckillMessageTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.012 s - in com.hmdp.reliability.SeckillMessageTest
+[INFO] Running com.hmdp.reliability.LoginCodeTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.reliability.LoginCodeTest
+[INFO] Running com.hmdp.reliability.CacheConcurrencyTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.015 s - in com.hmdp.reliability.CacheConcurrencyTest
+[INFO] Running com.hmdp.reliability.AccessGuardTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.reliability.AccessGuardTest
+[INFO] Running com.hmdp.MapperArchitectureTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.158 s - in com.hmdp.MapperArchitectureTest
+[INFO] Running com.hmdp.VoucherOrderReliabilityTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.15 s - in com.hmdp.VoucherOrderReliabilityTest
+[INFO] Running com.hmdp.MockPaymentTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.001 s - in com.hmdp.MockPaymentTest
+[INFO] Running com.hmdp.ShopSearchBoundaryTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0 s - in com.hmdp.ShopSearchBoundaryTest
+[INFO] Running com.hmdp.messaging.MessagingIntegrationTest
+[INFO] Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.709 s - in com.hmdp.messaging.MessagingIntegrationTest
+[INFO] Running com.hmdp.messaging.RocketMqIntegrationTest
+[INFO] Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 16.5 s - in com.hmdp.messaging.RocketMqIntegrationTest
+[INFO] Running com.hmdp.analytics.KafkaBehaviorIntegrationTest
+[INFO] Tests run: 2, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 6.227 s - in com.hmdp.analytics.KafkaBehaviorIntegrationTest
+[INFO] Running com.hmdp.analytics.BehaviorAggregationIntegrationTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.018 s - in com.hmdp.analytics.BehaviorAggregationIntegrationTest
+[INFO] Tests run: 77, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS
+[INFO] Total time:  01:10 min
+[INFO] Finished at: 2026-10-10T14:48:51Z
