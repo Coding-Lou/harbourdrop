@@ -8,8 +8,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Spring Data repository; complex statements are native SQL kept verbatim from the former MyBatis
- * XML.
+ * Spring Data repository. Statements that rely on row locks, SKIP LOCKED, INSERT IGNORE or
+ * conditional updates are native SQL whose affected-row counts callers check.
  */
 public interface OperationAuditRepository extends Repository<OperationAudit, Long> {
 

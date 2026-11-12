@@ -1,7 +1,7 @@
 package com.hmdp.repository;
 
 /**
- * Write operations with MyBatis-Plus semantics that Spring Data's {@code save} does not provide.
+ * Insert and partial-update operations that Spring Data's {@code save} does not provide.
  *
  * <p>{@code save} merges an entity whose ID is already set, which would silently turn a duplicate
  * insert into an update. {@link #insert} always issues an INSERT and flushes immediately, so a
