@@ -120,6 +120,24 @@ services:
     depends_on:
       connect:
         condition: service_healthy
+  otel-agent-init:
+    # Fetches the pinned OpenTelemetry Java agent once into a volume (not committed to git).
+    image: curlimages/curl:8.11.1
+    user: '0'
+    entrypoint: [/bin/sh, -c]
+    command:
+      - >-
+        test -s /otel/opentelemetry-javaagent-2.33.1.jar ||
+        curl -fsSL -o /otel/opentelemetry-javaagent-2.33.1.jar
+        https://repo1.maven.org/maven2/io/opentelemetry/javaagent/opentelemetry-javaagent/2.33.1/opentelemetry-javaagent-2.33.1.jar
+    volumes:
+      - otel-agent:/otel
+  jaeger:
+    # Trace UI at http://127.0.0.1:16686; receives OTLP from the Java agent.
+    image: jaegertracing/jaeger:2.23.0
+    profiles: [observability]
+    ports:
+      - '127.0.0.1:${HMDP_TRACING_UI_PORT:-16686}:16686'
   mailpit:
     # Local SMTP sink for login codes; open http://127.0.0.1:8025 to read them.
     image: axllent/mailpit:v1.21
@@ -128,7 +146,12 @@ services:
   java:
     image: maven:3.9-eclipse-temurin-21
     working_dir: /workspace
-    command: [mvn, -DskipTests, spring-boot:run]
+    # The agent is attached to the forked application JVM only, not to Maven itself.
+    command:
+      - mvn
+      - -DskipTests
+      - spring-boot:run
+      - -Dspring-boot.run.jvmArguments=-javaagent:/otel/opentelemetry-javaagent-2.33.1.jar
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hmdp?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
       SPRING_DATASOURCE_USERNAME: root
@@ -149,11 +172,18 @@ services:
       SPRING_MAIL_HOST: mailpit
       SPRING_MAIL_PORT: '1025'
       HMDP_UPLOAD_DIR: /uploads
+      # Tracing is off unless HMDP_TRACING_ENABLED=true (start Jaeger with --profile observability).
+      OTEL_JAVAAGENT_ENABLED: ${HMDP_TRACING_ENABLED:-false}
+      OTEL_SERVICE_NAME: hmdp-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
       CITYLENS_CATALOG_ADMIN_IDS: ${HMDP_ADMIN_IDS:-}
       CITYLENS_PAYMENT_MOCK_ENABLED: ${HMDP_PAYMENT_MOCK_ENABLED:-false}
     ports:
       - '127.0.0.1:${HMDP_API_PORT:-8081}:8081'
     volumes:
+      - otel-agent:/otel:ro
       - ..:/workspace
       - maven-cache:/root/.m2
       - ${HMDP_UPLOAD_HOST_DIR:-./data/uploads}:/uploads
@@ -168,6 +198,8 @@ services:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
+      otel-agent-init:
+        condition: service_completed_successfully
   web:
     image: nginx:alpine
     ports:
@@ -180,7 +212,7 @@ services:
       - java
   prometheus:
     image: prom/prometheus:v2.55.1
-    profiles: [monitoring]
+    profiles: [monitoring, observability]
     entrypoint: [/bin/sh, /etc/prometheus/start.sh]
     environment:
       HMDP_MONITOR_TOKEN: ${HMDP_MONITOR_TOKEN:-hmdp_dev_metrics}
@@ -194,7 +226,7 @@ services:
       - alertmanager
   alertmanager:
     image: prom/alertmanager:v0.27.0
-    profiles: [monitoring]
+    profiles: [monitoring, observability]
     command: [--config.file=/etc/alertmanager/alertmanager.yml, --storage.path=/alertmanager]
     ports:
       - '127.0.0.1:${HMDP_ALERT_PORT:-9094}:9093'
@@ -202,6 +234,7 @@ services:
       - ./monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
       - alertmanager-data:/alertmanager
 volumes:
+  otel-agent:
   kafka-data:
   prometheus-data:
   alertmanager-data:
