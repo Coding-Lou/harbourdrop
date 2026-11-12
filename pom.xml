@@ -22,16 +22,8 @@
             <artifactId>kafka-clients</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.rocketmq</groupId>
-            <artifactId>rocketmq-client</artifactId>
-            <version>5.3.2</version>
-            <exclusions>
-                <!-- Broker-side native RocksDB is not used by the Java remoting client. -->
-                <exclusion>
-                    <groupId>org.apache.rocketmq</groupId>
-                    <artifactId>rocketmq-rocksdb</artifactId>
-                </exclusion>
-            </exclusions>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
         </dependency>
         <dependency>
             <groupId>com.alibaba.otter</groupId>

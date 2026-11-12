@@ -28,6 +28,19 @@ spring:
     baseline-version: 0
   jackson:
     default-property-inclusion: non_null # JSON处理时忽略非空字段
+  kafka:
+    bootstrap-servers: ${HMDP_KAFKA_SERVERS:127.0.0.1:9092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        max.block.ms: 5000
+        request.timeout.ms: 3000
+        delivery.timeout.ms: 10000
+    consumer:
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 20
 mybatis-plus:
   type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:
@@ -70,14 +83,15 @@ hmdp:
   mq:
     enabled: ${HMDP_MQ_ENABLED:false}
     seckill-enabled: ${HMDP_MQ_SECKILL_ENABLED:false}
-    nameserver: ${HMDP_MQ_NAMESERVER:127.0.0.1:9876}
     group-prefix: ${HMDP_MQ_GROUP_PREFIX:hmdp}
-    business-topic: HmdpBusiness
-    deadline-topic: HmdpOrderDeadline
+    # One Kafka topic per logical consumer group: hmdp.biz.feed, hmdp.biz.orders, ...
+    topic-prefix: hmdp.biz.
+    topic-partitions: 3
+    topic-replication-factor: ${HMDP_MQ_REPLICATION_FACTOR:1}
     consumer-enabled: true
     lease-seconds: 60
     relay-batch-size: 20
-    send-timeout-ms: 3000
+    send-timeout-ms: 10000
   monitor-token: ${HMDP_MONITOR_TOKEN:}
   cache:
     enabled: true

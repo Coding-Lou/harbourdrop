@@ -119,15 +119,17 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
 
   private boolean deliverOutboxTask(BusinessOutboxTask task, String leaseOwner) {
     BusinessEvent event = BusinessEvent.from(task);
+    // Kafka has no per-message delay: a future deadline stays in the outbox (next_attempt_at =
+    // deliver_at) and is published by the relay once due, so the database is the timer.
+    if (event.getDeliverAt() != null && event.getDeliverAt() > System.currentTimeMillis()) {
+      businessOutboxMapper.deferDeadline(task.getId(), leaseOwner);
+      return false;
+    }
     if (mqEnabled) {
       publishers.getObject().publish(event);
       // 快速消费可能已经完成；owner/state 条件防止 DONE 被覆盖成 SENT。
       businessOutboxMapper.markSent(task.getId(), leaseOwner);
       return true;
-    }
-    if (event.getDeliverAt() != null && event.getDeliverAt() > System.currentTimeMillis()) {
-      businessOutboxMapper.deferDeadline(task.getId(), leaseOwner);
-      return false;
     }
     consumer.consume(event, BusinessEventServiceImpl.resolveConsumerGroup(event.getKind()));
     return true;

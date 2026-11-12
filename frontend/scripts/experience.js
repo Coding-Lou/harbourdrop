@@ -317,7 +317,7 @@ Vue.component("experience-page", {
         }
         this.orderMessage = this.capabilities.mqEnabled
           ? "订单已落库，正在等待事件消费回执…"
-          : "订单已落库；当前未启用 RocketMQ。";
+          : "订单已落库；当前未启用业务消息队列。";
         if (!this.capabilities.mqEnabled) return;
         await this.wait();
       }
@@ -372,7 +372,7 @@ Vue.component("experience-page", {
       <div v-if="loading" class="experience-loading" role="status">正在准备可体验的店铺与接口…</div>
       <div v-else-if="!capabilities || !capabilities.enabled" class="panel experience-disabled"><h2>体验观察尚未启用</h2><p>部署者启用 HMDP_EXPERIENCE_ENABLED 后可使用此页面。正常业务页面仍可访问。</p><a class="button outline" href="/">先逛逛首页</a></div>
       <template v-else>
-        <section class="experience-status" aria-label="运行状态"><div><span>缓存查询</span><strong>{{ capabilities.cacheEnabled ? '已开启' : '已关闭' }}</strong></div><div><span>Kafka 消费线程</span><strong>{{ capabilityText(capabilities.analyticsEnabled, capabilities.kafkaConsumerRunning, '运行中') }}</strong></div><div><span>RocketMQ 客户端</span><strong>{{ capabilityText(capabilities.mqEnabled, capabilities.mqClientStarted, '已启动') }}</strong></div><div><span>Canal 连接</span><strong>{{ capabilityText(capabilities.cdcEnabled, capabilities.cdcConnected, '已连接') }}</strong></div></section>
+        <section class="experience-status" aria-label="运行状态"><div><span>缓存查询</span><strong>{{ capabilities.cacheEnabled ? '已开启' : '已关闭' }}</strong></div><div><span>Kafka 消费线程</span><strong>{{ capabilityText(capabilities.analyticsEnabled, capabilities.kafkaConsumerRunning, '运行中') }}</strong></div><div><span>业务消息（Kafka）</span><strong>{{ capabilityText(capabilities.mqEnabled, capabilities.mqClientStarted, '已启动') }}</strong></div><div><span>Canal 连接</span><strong>{{ capabilityText(capabilities.cdcEnabled, capabilities.cdcConnected, '已连接') }}</strong></div></section>
         <div class="experience-picker"><label for="experience-shop">先选一家店</label><select id="experience-shop" v-model="shopId" :disabled="working" @change="samples = []; eventIds = []; receipts = []; heatBefore = null; heatAfter = null; kafkaMessage = ''"><option v-for="shop in shops" :key="shop.id" :value="String(shop.id)">{{ shop.name }}</option></select><span>缓存与浏览事件使用这家店铺</span></div>
         <section class="panel experience-card" aria-labelledby="cache-experience-title">
           <div class="experience-card-head"><span class="experience-step">01</span><div><span class="eyebrow">多级缓存</span><h2 id="cache-experience-title">同一份数据，少走几步路。</h2><p>连续发出 3 个请求，每个请求读取店铺两次，观察数据来自哪一层。</p></div><button class="button primary" :disabled="working || !shopId" @click="runCache">{{ cacheBusy ? '正在采样…' : samples.length ? '再采样一次' : '连续读取 3 次' }}<i class="el-icon-right" aria-hidden="true"></i></button></div>
@@ -388,7 +388,7 @@ Vue.component("experience-page", {
           <p class="experience-note">提交成功不等于消费完成。只有本次事件号出现在数据库中才显示完成；热榜约每 5 秒刷新，其他访客也会影响统计。匿名浏览增加 PV，同一登录用户重复浏览不会重复增加窗口 UV。此操作会记录真实浏览，浏览采集允许丢失。</p>
         </section>
         <section class="panel experience-card" aria-labelledby="order-experience-title">
-          <div class="experience-card-head"><span class="experience-step">03</span><div><span class="eyebrow">订单幂等 · RocketMQ · 秒杀履约</span><h2 id="order-experience-title">点两次，也只得到一笔订单。</h2><p>使用测试账号创建订单，查看事件回执，再主动重复提交一次。</p></div><a v-if="!user" class="button outline" :href="loginUrl">登录后体验<i class="el-icon-right" aria-hidden="true"></i></a><span v-else class="tag">{{ user.nickName }} · 已登录</span></div>
+          <div class="experience-card-head"><span class="experience-step">03</span><div><span class="eyebrow">订单幂等 · Kafka · 秒杀履约</span><h2 id="order-experience-title">点两次，也只得到一笔订单。</h2><p>使用测试账号创建订单，查看事件回执，再主动重复提交一次。</p></div><a v-if="!user" class="button outline" :href="loginUrl">登录后体验<i class="el-icon-right" aria-hidden="true"></i></a><span v-else class="tag">{{ user.nickName }} · 已登录</span></div>
           <div v-if="voucherLoading" class="inline-empty">正在寻找可用优惠券…</div><div v-else-if="voucherFailures && !vouchers.length" class="inline-empty">优惠券接口未能全部返回，当前无法确认是否有可用券，请刷新页面后重试。</div><div v-else-if="!vouchers.length" class="inline-empty">当前没有可下单的优惠券。部署者准备普通券或有效期内的秒杀券后即可体验。</div>
           <template v-else><p v-if="voucherFailures" class="experience-note">部分店铺的优惠券未能加载，下方仅展示已查询成功的可用券。</p><div class="experience-order-picker"><label for="experience-voucher">选择优惠券</label><select id="experience-voucher" v-model="voucherId" :disabled="working || !!orderId" @change="confirmOrder = false"><option v-for="voucher in vouchers" :key="voucher.id" :value="String(voucher.id)">{{ voucher.shopName }} · {{ voucher.title }} · ¥{{ money(voucher.payValue) }} · {{ voucher.type ? '秒杀券' : '普通券' }}</option></select><button v-if="user && !orderId" class="button outline" :disabled="working" @click="confirmOrder = true">准备提交</button></div>
           <div v-if="confirmOrder && selectedVoucher" class="experience-confirm"><h3>确认创建这笔真实订单？</h3><p>{{ selectedVoucher.title }} · ¥{{ money(selectedVoucher.payValue) }}。{{ selectedVoucher.type ? '秒杀成功会占用库存与领取资格，当前不支持取消秒杀订单。' : Number(selectedVoucher.payValue) === 0 ? '免费券会直接成为已领取状态，请使用测试账号。' : '仅创建待付款订单，不会扣款；测试后可以取消。' }}</p><div><button class="button soft" @click="confirmOrder = false">先不提交</button><button class="button primary" :disabled="working" @click="submitOrder(false)">确认提交</button></div></div>

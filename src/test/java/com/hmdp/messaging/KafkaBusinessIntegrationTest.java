@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,7 +32,6 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
-@Disabled("Rewritten for Kafka in migration phase 5")
 @SpringBootTest(
     properties = {
       "citylens.reliability.scheduling-enabled=false",
@@ -42,13 +40,13 @@ import org.springframework.transaction.support.TransactionTemplate;
       "hmdp.mq.group-prefix=hmdp-integration"
     })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class RocketMqIntegrationTest extends IntegrationTestBase {
+class KafkaBusinessIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired BusinessOutboxMapper businessOutboxMapper;
   @Autowired TransactionTemplate transactions;
   @Autowired BusinessOutboxServiceImpl outbox;
   @Autowired OutboxRelayServiceImpl relay;
-  @Autowired RocketMqTransport transport;
+  @Autowired KafkaBusinessTransport transport;
   @Autowired VoucherOrderServiceImpl orders;
   @Autowired SeckillServiceImpl coordinator;
   @Autowired StringRedisTemplate redis;
@@ -63,7 +61,7 @@ class RocketMqIntegrationTest extends IntegrationTestBase {
     jdbc.update(
         "INSERT INTO "
             + "tb_voucher(id,shop_id,title,rules,pay_value,actual_value,type,status) "
-            + "VALUES(?,1,'rocket-test','rules',100,200,0,1)",
+            + "VALUES(?,1,'kafka-test','rules',100,200,0,1)",
         SKU);
     UserDTO user = new UserDTO();
     user.setId(USER);
@@ -83,7 +81,7 @@ class RocketMqIntegrationTest extends IntegrationTestBase {
       }
       Thread.sleep(100);
     }
-    fail("真实 RocketMQ 消费未在 45 秒内完成");
+    fail("真实 Kafka 消费未在 45 秒内完成");
   }
 
   @Test
@@ -135,11 +133,18 @@ class RocketMqIntegrationTest extends IntegrationTestBase {
         1,
         jdbc.queryForObject(
             "SELECT status FROM tb_voucher_order WHERE id=?", Integer.class, unpaid));
+    // Not due yet: the relay keeps it in the outbox instead of handing it to the broker.
+    assertEquals(
+        "PENDING",
+        jdbc.queryForObject(
+            "SELECT state FROM tb_business_outbox WHERE id=?", String.class, deadline));
     await(
-        () ->
-            jdbc.queryForObject(
-                    "SELECT status FROM tb_voucher_order WHERE id=?", Integer.class, unpaid)
-                == 4);
+        () -> {
+          relay.relayOutboxBatch();
+          return jdbc.queryForObject(
+                  "SELECT status FROM tb_voucher_order WHERE id=?", Integer.class, unpaid)
+              == 4;
+        });
     long paid = ((Number) orders.orderOrdinaryVoucher(SKU).getData()).longValue();
     assertNotEquals(unpaid, paid);
     long paidDeadline =
@@ -155,22 +160,23 @@ class RocketMqIntegrationTest extends IntegrationTestBase {
         paid,
         paidDeadline);
     assertTrue(orders.payMockOrder(paid, 100L).getSuccess());
-    relay.relayOutboxBatch();
     await(
-        () ->
-            "DONE"
-                .equals(
-                    jdbc.queryForObject(
-                        "SELECT state FROM tb_business_outbox WHERE id=?",
-                        String.class,
-                        paidDeadline)));
+        () -> {
+          relay.relayOutboxBatch();
+          return "DONE"
+              .equals(
+                  jdbc.queryForObject(
+                      "SELECT state FROM tb_business_outbox WHERE id=?",
+                      String.class,
+                      paidDeadline));
+        });
     assertEquals(
         2,
         jdbc.queryForObject("SELECT status FROM tb_voucher_order WHERE id=?", Integer.class, paid));
   }
 
   @Test
-  void luaStreamHandoffAndRocketFulfillmentRemainIdempotent() throws Exception {
+  void luaStreamHandoffAndKafkaFulfillmentRemainIdempotent() throws Exception {
     long sku = 916010;
     jdbc.update("DELETE FROM tb_seckill_reservation WHERE voucher_id=?", sku);
     jdbc.update("DELETE FROM tb_voucher_order WHERE voucher_id=?", sku);
@@ -235,5 +241,32 @@ class RocketMqIntegrationTest extends IntegrationTestBase {
         jdbc.queryForObject(
             "SELECT stock FROM tb_seckill_voucher WHERE voucher_id=?", Integer.class, sku));
     assertEquals("0", redis.opsForValue().get("seckill:stock:" + sku));
+  }
+
+  @Test
+  void eventThatDoesNotMatchItsOutboxRowIsQuarantinedNotRetriedForever() throws Exception {
+    transactions.execute(
+        tx -> {
+          outbox.appendBusinessEvent("ORDER_CREATED", 916020, USER);
+          return null;
+        });
+    long id = jdbc.queryForObject("SELECT MAX(id) FROM tb_business_outbox", Long.class);
+    BusinessEvent forged = BusinessEvent.from(businessOutboxMapper.selectEventById(id));
+    forged.setAggregateId(916021);
+    transport.publish(forged);
+    await(
+        () ->
+            jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM tb_message_failure WHERE consumer_group='orders' "
+                        + "AND broker_message_id LIKE 'hmdp.biz.orders-%'",
+                    Long.class)
+                > 0);
+    assertEquals(
+        0L,
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM tb_message_inbox WHERE event_id=?", Long.class, id));
+    assertNotEquals(
+        "DONE",
+        jdbc.queryForObject("SELECT state FROM tb_business_outbox WHERE id=?", String.class, id));
   }
 }
