@@ -1,6 +1,6 @@
 # 10 Kafka 行为分析与热榜
 
-[返回目录](README.md) · [上一章](09-RocketMQ可靠消息.md) · [下一章：社区与页面](11-社区搜索与页面验证.md)
+[返回目录](README.md) · [上一章：Kafka 可靠业务消息](09-RocketMQ可靠消息.md) · [下一章：社区与页面](11-社区搜索与页面验证.md)
 
 **本章学习目标**：先区分浏览与订单分析的可靠性要求，再沿一条 eventId 阅读生产、消费、事务与 offset。最后手算 PV、登录 UV 和热度。读完应能说出回执、统计窗口与热榜缓存分别证明什么。
 
@@ -42,7 +42,7 @@
 
 查店铺、创建订单、模拟支付会产生行为事件。直接在每次网页请求里同步更新复杂排行榜，会增加请求等待，把分析故障传给业务页面。
 
-当前通过 Kafka 收集事件，消费端保存去重事实并聚合，页面读取短期热榜。RocketMQ 更偏可靠业务任务；Kafka 在这里承担可重放的行为日志与分析通道。不是因为“Kafka 比 RocketMQ 一定更快”才选，也不要求每个项目同时使用两种 MQ。
+当前通过 Kafka 收集事件，消费端保存去重事实并聚合，页面读取短期热榜。第 09 章的业务事件现在也跑在**同一个 Kafka 集群**上，但两者用不同的 topic 和不同的可靠性策略：业务事件走 `hmdp.biz.<group>`，由 Spring for Apache Kafka 的监听容器逐条提交 offset，失败按业务规则隔离；行为分析走 `HmdpShopBehavior`，用原生 kafka-clients 手动 `commitSync`，浏览允许丢、订单走分析 Outbox。迁移前业务事件用 RocketMQ、行为分析用 Kafka，是两套中间件；合并到一个 broker 后少了一套要运维的组件，而“哪条链路需要多强的保证”仍由各自的 Outbox、去重和提交策略决定，与用不用同一个 MQ 无关。本章的行为链路在迁移中逻辑没有改动，只是 SQL 从 MyBatis XML 搬进了 [BehaviorRepository](../src/main/java/com/hmdp/repository/BehaviorRepository.java) 的 JPA 原生查询，语义不变。
 
 代码入口：[BehaviorJournalServiceImpl](../src/main/java/com/hmdp/service/impl/BehaviorJournalServiceImpl.java)、[KafkaBehaviorTransport](../src/main/java/com/hmdp/analytics/KafkaBehaviorTransport.java)、[BehaviorAggregationServiceImpl](../src/main/java/com/hmdp/service/impl/BehaviorAggregationServiceImpl.java)、[ShopHeatServiceImpl](../src/main/java/com/hmdp/service/impl/ShopHeatServiceImpl.java)。
 
@@ -75,7 +75,7 @@ PV 是访问事件次数；UV 是去重用户数。相同口径下，一个用�
 
 Topic 可以有多个分区，每个分区是一条有序日志；同一消费组分配分区给组内消费者。offset 是分区中的读取位置，不是业务 ID。不同分区之间不保证全局先后次序。
 
-当前 Topic 为 `HmdpShopBehavior`，完整本地环境使用 3 分区、单副本，保留约 72 小时；默认消费组 `hmdp-heat-v1`。一个消费组扩实例能增加分区并行处理，但有效并行度受分区数限制。
+当前 Topic 为 `HmdpShopBehavior`，完整本地环境由 compose 的 `kafka-init` 容器创建：3 分区、单副本，保留约 72 小时；默认消费组 `hmdp-heat-v1`。同一个 broker 上还有业务事件的 `hmdp.biz.*` topic 和 CDC 的 `hmdp-cdc.*` topic，它们各有自己的消费组，互不影响这里的 offset。一个消费组扩实例能增加分区并行处理，但有效并行度受分区数限制。
 
 消费者关闭自动提交，先处理数据库效果，再 `commitSync` 提交 offset。要分清：Kafka Producer 收到发送确认，并不表示数据库消费已经完成。
 
@@ -98,7 +98,7 @@ Topic 可以有多个分区，每个分区是一条有序日志；同一消费�
 
 ### 怎样读重复事件处理
 
-当前聚合服务先调用 Mapper 的 `insertEvent`。插入返回 0 时，再查询已有 eventId 的内容，核对 shopId、action、userId 与 occurredAt 全部一致：一致才视为重复；不一致会抛出“同一行为事件号对应不同内容”。
+当前聚合服务先调用 [BehaviorRepository](../src/main/java/com/hmdp/repository/BehaviorRepository.java) 的 `insertEvent`（原生 `INSERT IGNORE`，返回影响行数）。插入返回 0 时，再查询已有 eventId 的内容，核对 shopId、action、userId 与 occurredAt 全部一致：一致才视为重复；不一致会抛出“同一行为事件号对应不同内容”。
 
 这比“任何 INSERT IGNORE 都当重复成功”更严谨。去重键相同既可能是真重试，也可能是事件身份冲突，必须分清。新事件插入和统计加一在同一数据库事务中，所以统计更新失败时不能留下一个阻止重试的已处理事实。
 
@@ -256,7 +256,7 @@ public void appendOrderBehaviorEvent(BusinessOutboxTask source) {
     throw new IllegalStateException("订单分析事件需要业务事务");
   }
   List<Map<String, Object>> rows =
-      voucherOrderMapper.selectBehaviorSnapshot(source.getAggregateId());
+      voucherOrderRepository.selectBehaviorSnapshot(source.getAggregateId());
   if (rows.isEmpty() || rows.get(0).get("shop_id_snapshot") == null) {
     return;
   }
@@ -269,7 +269,7 @@ public void appendOrderBehaviorEvent(BusinessOutboxTask source) {
           "ORDER_PAID".equals(source.getKind()) ? "PAID" : "ORDER",
           source.getCreatedAt().getTime());
   try {
-    behaviorMapper.insertOutboxEvent(
+    behaviorRepository.insertOutboxEvent(
         event.getEventId(), event.getShopId(), json.writeValueAsString(event));
   } catch (JsonProcessingException bad) {
     throw new IllegalArgumentException("订单分析事件编码失败", bad);
@@ -280,9 +280,9 @@ public void appendOrderBehaviorEvent(BusinessOutboxTask source) {
 
 这里接收的是业务 ORDER_CREATED/ORDER_PAID 投影任务，从订单读取店铺与用户快照，生成 `order:{业务eventId}`，把编码后的事件写入 `tb_behavior_outbox`。登记发生在业务消息消费的数据库事务内。
 
-可靠分析链路是“订单事实 → 业务 Outbox → 业务消息消费 → 分析 Outbox → Kafka → 去重事实”，不是简单在浏览器建单按钮后顺手 send。每个交接点都要保留稳定身份与恢复责任。
+可靠分析链路是“订单事实 → 业务 Outbox → 业务消息消费（Kafka topic `hmdp.biz.orders`）→ 分析 Outbox → Kafka topic `HmdpShopBehavior` → 去重事实”，不是简单在浏览器建单按钮后顺手 send。每个交接点都要保留稳定身份与恢复责任。
 
-**当前边界**：普通建单调用 lifecycle.created；现有秒杀 createVoucherOrder 没有同样调用 ORDER_CREATED 生命周期登记。因此不能承诺热榜已统计所有秒杀创建订单。免费券 status=2 也不表示发生了一次模拟支付 PAID。后续统一事件登记是明确的优化方向。
+**当前边界**：普通建单调用 `lifecycle.registerOrderCreatedEventAndDeadline`；现有秒杀 createVoucherOrder 没有同样调用 ORDER_CREATED 生命周期登记。因此不能承诺热榜已统计所有秒杀创建订单。免费券 status=2 也不表示发生了一次模拟支付 PAID。后续统一事件登记是明确的优化方向。
 
 <a id="section-09"></a>
 
@@ -403,7 +403,7 @@ public void accept(BehaviorEvent event) {
   transactions.execute(
       tx -> {
         long bucket = event.getOccurredAt() / 60000 * 60000;
-        if (behaviorMapper.insertEvent(
+        if (behaviorRepository.insertEvent(
                 event.getEventId(),
                 event.getShopId(),
                 event.getUserId(),
@@ -411,7 +411,7 @@ public void accept(BehaviorEvent event) {
                 event.getOccurredAt(),
                 bucket)
             == 0) {
-          Map<String, Object> old = behaviorMapper.selectEvent(event.getEventId());
+          Map<String, Object> old = behaviorRepository.selectEvent(event.getEventId());
           if (((Number) old.get("shop_id")).longValue() != event.getShopId()
               || !Objects.equals(old.get("action"), event.getAction())
               || !Objects.equals(old.get("user_id"), event.getUserId())
@@ -420,32 +420,32 @@ public void accept(BehaviorEvent event) {
           }
           return null;
         }
-        behaviorMapper.accumulateBucket(
+        behaviorRepository.accumulateBucket(
             event.getShopId(),
             bucket,
             "VISIT".equals(event.getAction()) ? 1 : 0,
             "ORDER".equals(event.getAction()) ? 1 : 0,
             "PAID".equals(event.getAction()) ? 1 : 0);
         if ("VISIT".equals(event.getAction()) && event.getUserId() != null) {
-          behaviorMapper.insertVisitUser(event.getShopId(), event.getUserId(), bucket);
+          behaviorRepository.insertVisitUser(event.getShopId(), event.getUserId(), bucket);
         }
         return null;
       });
 }
 ```
 
-以下为 [BehaviorMapper.xml](../src/main/resources/mapper/BehaviorMapper.xml) 的相关源码片段。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
+以下为 [BehaviorRepository.java](../src/main/java/com/hmdp/repository/BehaviorRepository.java) 的相关源码片段（迁移前在 MyBatis XML 中，原样搬进了 `@Query(nativeQuery = true)`）。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
 
 ```sql
 INSERT IGNORE INTO tb_behavior_event(event_id,shop_id,user_id,action,occurred_at_ms,bucket_ms)
-VALUES(#{eventId},#{shopId},#{userId},#{action},#{occurredAtMs},#{bucketMs})
+VALUES(:eventId,:shopId,:userId,:action,:occurredAtMs,:bucketMs)
 ```
 
-以下为 [BehaviorMapper.xml](../src/main/resources/mapper/BehaviorMapper.xml) 的相关源码片段。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
+以下为 [BehaviorRepository.java](../src/main/java/com/hmdp/repository/BehaviorRepository.java) 的相关源码片段。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
 
 ```sql
 INSERT INTO tb_shop_heat_bucket(shop_id,bucket_ms,visits,orders,payments)
-VALUES(#{shopId},#{bucketMs},#{visits},#{orders},#{payments})
+VALUES(:shopId,:bucketMs,:visits,:orders,:payments)
 ON DUPLICATE KEY UPDATE visits=visits+VALUES(visits),orders=orders+VALUES(orders),payments=payments+VALUES(payments)
 ```
 
@@ -481,11 +481,11 @@ public List<Map<String, Object>> ranking(int minutes, int limit) {
   long from = now - (minutes - 1L) * 60000;
   // COUNT DISTINCT over the entire window avoids adding per-minute UVs and over-counting
   // repeat visitors.
-  return behaviorMapper.selectRanking(from, now, from, now, limit);
+  return behaviorRepository.selectRanking(from, now, from, now, limit);
 }
 ```
 
-以下为 [BehaviorMapper.xml](../src/main/resources/mapper/BehaviorMapper.xml) 的相关源码片段。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
+以下为 [BehaviorRepository.java](../src/main/java/com/hmdp/repository/BehaviorRepository.java) 的相关源码片段。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
 
 ```sql
 SELECT b.shop_id,s.name,SUM(b.visits) AS pv,COALESCE(u.uv,0) AS logged_uv,SUM(b.orders) AS orders,SUM(b.payments) AS mock_payments,SUM(b.visits)+COALESCE(u.uv,0)*2+SUM(b.orders)*5+SUM(b.payments)*10 AS heat
@@ -493,11 +493,11 @@ FROM tb_shop_heat_bucket b
 JOIN tb_shop s ON s.id=b.shop_id
 LEFT JOIN (SELECT shop_id,COUNT(DISTINCT user_id) AS uv
 FROM tb_shop_visit_user
-WHERE bucket_ms BETWEEN #{uvFromMs} AND #{uvToMs}
+WHERE bucket_ms BETWEEN :uvFromMs AND :uvToMs
 GROUP BY shop_id) u ON u.shop_id=b.shop_id
-WHERE b.bucket_ms BETWEEN #{bucketFromMs} AND #{bucketToMs}
+WHERE b.bucket_ms BETWEEN :bucketFromMs AND :bucketToMs
 GROUP BY b.shop_id,s.name,u.uv
-ORDER BY heat DESC,b.shop_id LIMIT #{limit}
+ORDER BY heat DESC,b.shop_id LIMIT :limit
 ```
 
 
@@ -516,6 +516,8 @@ Redis 热榜是 15 秒短快照，后台约 5 秒刷新；MySQL 分钟桶是已�
 选择隔离事件固定 eventId、shopId、action、userId、occurredAt，处理一次后记桶；再次处理相同内容应不再加；同 eventId 改内容应冲突隔离，而不是覆盖；模拟 offset 提交失败后重放也应保持累计值。
 
 访问事件一旦换 UUID，就是另一条事件，会按新访问累计。为了验证幂等却每次随机生成 eventId，会测试错对象。页面的三次浏览故意是三个不同事件，应得到三条回执。
+
+对应的自动化测试：[BehaviorAggregationIntegrationTest](../src/test/java/com/hmdp/analytics/BehaviorAggregationIntegrationTest.java) 覆盖跨分钟 UV 去重、匿名只加 PV、重复与乱序投递不重复计数、同 eventId 不同内容被拒绝；[KafkaBehaviorIntegrationTest](../src/test/java/com/hmdp/analytics/KafkaBehaviorIntegrationTest.java) 用 Testcontainers 启动的真实 Kafka 验证重投幂等、HTTP 访问被采集，以及订单与模拟支付经持久分析 Outbox 到达 Kafka。它们随 `./mvnw verify` 一起运行，只需要本机 Docker 在运行。
 
 <a id="section-13"></a>
 
@@ -553,7 +555,7 @@ Redis 热榜是 15 秒短快照，后台约 5 秒刷新；MySQL 分钟桶是已�
 
 假设同一家店在同一统计窗口内收到：用户甲两条不同 eventId 的 VISIT、用户乙一条 VISIT、匿名访客一条 VISIT、用户甲的第一条 VISIT 重放一次。四条独立事件应使 PV=4，重放不再加一；logged_uv=2，因为甲去重、乙计入，匿名没有登录身份。
 
-再增加一条 ORDER 和一条 PAID，当前热度公式是 `PV + logged_uv × 2 + orders × 5 + mock_payments × 10`，演算结果为 `4 + 2×2 + 1×5 + 1×10 = 23`。这是 [BehaviorMapper](../src/main/resources/mapper/BehaviorMapper.xml) 中的确定性规则，不是训练得到的推荐模型。
+再增加一条 ORDER 和一条 PAID，当前热度公式是 `PV + logged_uv × 2 + orders × 5 + mock_payments × 10`，演算结果为 `4 + 2×2 + 1×5 + 1×10 = 23`。这是 [BehaviorRepository](../src/main/java/com/hmdp/repository/BehaviorRepository.java) 排名 SQL 中的确定性规则，不是训练得到的推荐模型。
 
 匿名 PV 能增加而登录 UV 不增加，是统计定义，不是丢消息。支付字段当前表示模拟支付行为，不能将它解释成真实资金成交量。演示时把指标名称连同口径一起讲，避免只有“热度 23”却说不清来源。
 

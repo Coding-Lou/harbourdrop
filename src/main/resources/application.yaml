@@ -68,6 +68,10 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # A mail outage must not mark the API as down; login-code delivery reports its own failures.
+    mail:
+      enabled: false
 citylens:
   reliability:
     scheduling-enabled: true

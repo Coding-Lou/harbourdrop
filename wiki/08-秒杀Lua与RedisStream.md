@@ -1,6 +1,6 @@
 # 08 秒杀、Lua 与 Redis Stream
 
-[返回目录](README.md) · [上一章](07-优惠券与订单生命周期.md) · [下一章：RocketMQ](09-RocketMQ可靠消息.md)
+[返回目录](README.md) · [上一章](07-优惠券与订单生命周期.md) · [下一章：Kafka 可靠消息](09-RocketMQ可靠消息.md)
 
 **本章学习目标**：本章从超卖与一人一单问题推导到 Lua，再把预占、Stream、持久预约、Outbox 和正式订单连接起来。学习重点是每个崩溃窗口由谁继续处理，以及补偿为什么必须认准原订单身份。
 
@@ -49,10 +49,12 @@
 ```text
 浏览器提交 → Lua 原子预占并 XADD → 返回订单 ID（已受理）
 → Stream 消费登记预约 → 数据库持久 Outbox 交接 → ACK Stream
-→ RocketMQ → 数据库条件扣库存并保存订单 → 预约 SUCCESS
+→ Kafka（topic hmdp.biz.fulfillment）→ 数据库条件扣库存并保存订单 → 预约 SUCCESS
 ```
 
 这个流程分两阶段：**入口预占**与**数据库履约**。两者之间有在途状态，并不处在同一个跨组件事务中。
+
+迁移到 Kafka 后，Lua 预占、Redis Stream、持久交接到 Outbox（幂等键 `seckill:{orderId}`）再 ACK 的流程都没有变；变的只是交接之后的传输：Relay 把 `SECKILL_FULFILL` 事件发到 Kafka topic `hmdp.biz.fulfillment`，由消费组 `hmdp-fulfillment` 消费并完成数据库履约。迁移前这一段走 RocketMQ。
 
 <a id="section-02"></a>
 
@@ -94,17 +96,17 @@ AOF 当前配置 `appendfsync always`，是本地提高入口持久性的选择�
 
 [SeckillServiceImpl](../src/main/java/com/hmdp/service/impl/SeckillServiceImpl.java) 会扫描并接管空闲达到约 30 秒的消息；扫描游标轮转，避免坏消息一直卡住前面。接管不代表旧消费者一定停止，因此后续处理仍必须幂等。
 
-关键时机：启用 MQ 交接时，先确认预约身份，再把 `SECKILL_FULFILL` Outbox 写入 MySQL，提交后才 ACK Stream。即使 ACK 后 Java 重启，Outbox 已经接过持久任务；MQ 暂时不可用也可以后续继续投递。
+关键时机：启用 MQ 交接（`hmdp.mq.enabled` 与 `hmdp.mq.seckill-enabled` 都为 true）时，先确认预约身份，再把 `SECKILL_FULFILL` Outbox 写入 MySQL，提交后才 ACK Stream。即使 ACK 后 Java 重启，Outbox 已经接过持久任务；Kafka 暂时不可用也可以后续继续投递。
 
 当前预约登记与 Outbox 交接有各自事务步骤，不是“读取 Stream 后所有动作一个大事务”。如果崩溃发生在预约登记后、Outbox 交接前，未 ACK 的消息仍可重放并继续交接。Outbox 幂等键 `seckill:{orderId}` 防止重复创建有效交接任务。
 
-没有开启 MQ 交接时，当前消费服务仍能走直接数据库履约分支。这是功能开关下的路径差异，不要把关闭 MQ 的测试说成跑过了真实 RocketMQ。
+没有开启 MQ 交接时，当前消费服务仍能走直接数据库履约分支。这是功能开关下的路径差异，不要把关闭 MQ 的测试说成跑过了真实 Kafka。
 
 <a id="section-05"></a>
 
 ## 5. 数据库履约如何兜底
 
-后台履约校验预约与订单身份，按 `stock > 0` 条件减少 MySQL 库存，并保存订单与快照。数据库更新必须确认受影响行数，不能只认为 SQL 执行没有异常就成功。
+后台履约校验预约与订单身份，通过 `ISeckillVoucherService.deductStock` 按 `stock > 0` 条件减少 MySQL 库存，并保存订单与快照。数据库更新必须确认受影响行数，不能只认为 SQL 执行没有异常就成功。
 
 重复消息若对应同一成功业务，应恢复查询状态并确认，不再扣库存。相同 orderId 如果携带不同用户或券，则属于冲突消息，隔离保存死信，不能因为 ID 相同就返回成功，也不能释放真正用户的资格。
 
@@ -121,7 +123,7 @@ AOF 当前配置 `appendfsync always`，是本地提高入口持久性的选择�
 | REVIEW | 超过自动处理边界或需要人工确认 | 复核身份、任务、库存，不能当作失败直接释放 |
 | FAILED | 已明确失败并进入对应释放/补偿路径 | 可按实际结果重新参与，不能影响后续新预约 |
 
-`GET /voucher-order/requests/{id}` 会校验请求归属；数据库预约存在时优先用数据库事实，未登记时再读 Redis。网络错误不是 FAILED；MQ 不可用也不是立即退还库存的理由。
+`GET /voucher-order/requests/{id}` 会校验请求归属；数据库预约存在时优先用数据库事实，未登记时再读 Redis。网络错误不是 FAILED；Kafka 不可用也不是立即退还库存的理由。
 
 登记/处理故障会累计尝试；当前自动尝试达到配置上限（默认 5）后，部分预约进入 REVIEW 并保存死信。非法冲突消息按消息 ID 隔离，不替真正预约伪造失败。
 
@@ -176,6 +178,8 @@ UPDATE tb_seckill_voucher
 SET stock = stock - 1
 WHERE voucher_id = ? AND stock > 0;
 ```
+
+当前项目里这条 SQL 是 [SeckillVoucherRepository](../src/main/java/com/hmdp/repository/SeckillVoucherRepository.java) 的原生查询 `deductStock`（`UPDATE tb_seckill_voucher SET stock=stock-1 WHERE voucher_id=:voucherId AND stock>0`），[SeckillVoucherServiceImpl](../src/main/java/com/hmdp/service/impl/SeckillVoucherServiceImpl.java) 的 `deductStock` 把“影响行数 > 0”转换成 boolean 返回。
 
 只在当前行仍有库存时更新，第二个竞争者会看到条件不满足、影响 0 行。它能防库存小于 0，但不能单独防同一用户多次购买，也不能减少每个请求到数据库竞争的成本。
 
@@ -416,9 +420,9 @@ private void reclaimPending() {
  * <p>INSERT IGNORE 只避免重复写入，不能证明消息身份正确；冲突消息必须单独隔离。
  */
 private void registerAndValidateReservation(VoucherOrder order) {
-  seckillReservationMapper.insertReservation(
+  seckillReservationRepository.insertReservation(
       order.getId(), order.getVoucherId(), order.getUserId());
-  SeckillReservation reservation = seckillReservationMapper.selectReservation(order.getId());
+  SeckillReservation reservation = seckillReservationRepository.selectReservation(order.getId());
   if (reservation == null
       || !reservation.getVoucherId().equals(order.getVoucherId())
       || !reservation.getUserId().equals(order.getUserId())) {
@@ -438,10 +442,10 @@ private void registerAndValidateReservation(VoucherOrder order) {
 private void enqueueFulfillmentTask(VoucherOrder order) {
   transactions.execute(
       tx -> {
-        businessOutboxMapper.insertSeckillFulfillment(
+        businessOutboxRepository.insertSeckillFulfillment(
             order.getId(), order.getUserId(), "seckill:" + order.getId());
         // An explicit reservation retry can re-publish the same quarantined event.
-        businessOutboxMapper.retryFulfillment("seckill:" + order.getId());
+        businessOutboxRepository.retryFulfillment("seckill:" + order.getId());
         return null;
       });
   metrics.counter("hmdp.seckill.handoffs", "result", "durable").increment();
@@ -455,8 +459,8 @@ private void enqueueFulfillmentTask(VoucherOrder order) {
 | Lua 后、登记前 | Redis 预占与 Stream | 未确认消息消费/接管 |
 | 预约登记后、Outbox 前 | Redis + MySQL 预约 | Stream 未 ACK，重放继续交接 |
 | Outbox 提交后、ACK 前 | MySQL 预约与待办已存在 | Stream 重放幂等核对，不再建重复有效任务 |
-| Stream ACK 后、MQ 前 | MySQL Outbox | Relay 重试投递 |
-| MQ 重复投递 | 同一任务与预约身份 | Inbox/订单约束防重复 |
+| Stream ACK 后、Kafka 前 | MySQL Outbox | Relay 重试投递 |
+| Kafka 重复投递 | 同一任务与预约身份 | Inbox/订单约束防重复 |
 | MySQL 成功、Redis 状态写失败 | 订单与预约 SUCCESS | 查询以持久事实为准，展示后续修复 |
 
 这张表是理解为何同时出现 Stream、预约与 Outbox 的关键。多加一张表是为转移处理责任，不是为了凑架构名词。
@@ -492,16 +496,10 @@ protected void createVoucherOrder(VoucherOrder voucherOrder) {
             }
             return null;
           }
-          if (query().eq("user_id", userId).eq("voucher_id", voucherId).count() > 0) {
+          if (voucherOrderRepository.countByUserIdAndVoucherId(userId, voucherId) > 0) {
             throw new IllegalStateException("资格对应的订单号不一致，保留消息核对");
           }
-          boolean deducted =
-              seckillVoucherService
-                  .update()
-                  .setSql("stock = stock - 1")
-                  .eq("voucher_id", voucherId)
-                  .gt("stock", 0)
-                  .update();
+          boolean deducted = seckillVoucherService.deductStock(voucherId);
           if (!deducted) {
             throw new IllegalStateException("库存不足，保留消息核对");
           }
@@ -511,9 +509,8 @@ protected void createVoucherOrder(VoucherOrder voucherOrder) {
           }
           snapshot(voucherOrder, voucher);
           voucherOrder.setStatus(initialOrderStatus(voucher));
-          if (!save(voucherOrder)) {
-            throw new IllegalStateException("订单写入失败，回滚库存");
-          }
+          // insert() flushes immediately: a failure throws here and rolls back the stock.
+          voucherOrderRepository.insert(voucherOrder);
           if (coordinator != null) {
             coordinator.markReservationSuccessful(voucherOrder.getId());
           }
@@ -531,9 +528,9 @@ private static int initialOrderStatus(Voucher voucher) {
 ```
 
 
-履约先锁用户，再在事务中锁预约，只有 PROCESSING 可继续。已存在同 orderId 的订单要核对用户与券；同用户同券却是不同订单 ID 时，进入核对错误而不是直接冒充成功。
+履约先锁用户，再在事务中锁预约，只有 PROCESSING 可继续。已存在同 orderId 的订单要核对用户与券；同用户同券却是不同订单 ID 时（派生计数查询 `countByUserIdAndVoucherId`），进入核对错误而不是直接冒充成功。
 
-条件扣库存、快照、订单保存与预约 SUCCESS 在数据库事务内。订单写失败会抛异常回滚数据库库存；Redis 预占不会被这个数据库回滚自动撤销，所以错误留在可重试/复核链路。
+条件扣库存、快照、订单保存与预约 SUCCESS 在数据库事务内。订单用 `voucherOrderRepository.insert()` 保存：它总是发出 INSERT 并立即 flush，主键或唯一键冲突会在这一行抛出 `DataIntegrityViolationException`，回滚已经扣减的数据库库存（不用 Spring Data 的 `save()`，因为订单已带 Redis 生成的 ID，`save()` 会走 merge，可能把重复插入悄悄变成更新）。Redis 预占不会被这个数据库回滚自动撤销，所以错误留在可重试/复核链路。
 
 以下为 [seckill-compensate.lua](../src/main/resources/seckill-compensate.lua) 的相关源码片段。为便于阅读只展示当前部分，依赖与 import 请查看原文件；无需把片段另建类复制运行。
 
@@ -565,6 +562,8 @@ stock 缺失返回 -1、类型异常返回 -2，是“无法安全补偿”，�
 ## 16. 验证路线
 
 页面可以验证真实有效活动的提交、原 ID 幂等返回、PROCESSING → SUCCESS 与本人订单。数据库唯一约束、消费重放、宕机接管、补偿错配和库存并发应在隔离测试环境验证，见第 13 章。
+
+经过真实 Kafka 的交接链路由 [KafkaBusinessIntegrationTest](../src/test/java/com/hmdp/messaging/KafkaBusinessIntegrationTest.java) 的 `luaStreamHandoffAndKafkaFulfillmentRemainIdempotent` 覆盖：发布活动 → Lua 准入 → 同一条 Stream 消息处理两次，预约仍是 PROCESSING、订单表还没有记录、幂等键 `seckill:{orderId}` 只有一条 Outbox → Relay 发到 `hmdp.biz.fulfillment` 后预约变为 SUCCESS → 再手动重发同一事件，订单仍只有一条，数据库与 Redis 库存都为 0。测试用 Testcontainers 启动 MySQL、Redis 与 Kafka，只要本机 Docker 在运行，`./mvnw verify` 就会一起执行。
 
 没有有效秒杀活动时，页面不能凭空验证秒杀，应由管理员准备活动。不要把普通券重复领取成功说成“已验证高并发秒杀不超卖”。
 
@@ -598,7 +597,7 @@ Lua 在准入时写入 Stream，进程退出后不能只靠内存保存待办。
 
 开启秒杀 MQ 交接时，Stream 消费者先登记并核对持久预约，再在独立事务中写入唯一履约 Outbox 任务，等提交成功后才确认 Stream。预约登记与 Outbox 交接不是一个大事务；两步之间退出时，未 ACK 的 Stream 消息可以重放继续交接。之后 Outbox 即使尚未投递，数据库也已保存接下来的责任。没有这个持久交接，过早 ACK 后退出就可能无人再知道需要建订单。
 
-未开启该交接时，消费者走本地履约路径，再同步预约结果和确认消息。两种运行模式的责任终点不同，说明实验时应先记录实际开关，不能用本地投影通过证明真实 RocketMQ 网络已经验证。
+未开启该交接时，消费者走本地履约路径，再同步预约结果和确认消息。两种运行模式的责任终点不同，说明实验时应先记录实际开关，不能用本地投影通过证明真实 Kafka 网络已经验证。
 
 开启 MQ 交接时，用下面这张图确认每一段责任在哪里。图中两次数据库写入是分步完成，ACK 位于持久交接之后。
 
@@ -608,7 +607,7 @@ flowchart TD
     B --> C[独立事务登记唯一履约 Outbox]
     C --> D[提交成功后 ACK Stream]
     C --> E[Relay 沿原事件身份投递]
-    E --> F[RocketMQ 消费履约任务]
+    E --> F[Kafka 消费 hmdp.biz.fulfillment 履约任务]
     F --> G[数据库事务扣库存和保存订单]
     G --> H[预约 SUCCESS 与订单同事务提交]
     H --> I[提交后更新 Redis 展示]

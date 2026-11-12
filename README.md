@@ -219,7 +219,7 @@ npm --prefix frontend test
 
 测试覆盖缓存并发与版本、真实 Debezium CDC、Kafka 消息去重与隔离、到期关单、Kafka 聚合、秒杀身份与补偿、订单归属、登录与令牌生命周期、权限规则，以及对真实 MySQL 逐条执行全部原生 SQL 的冒烟测试。
 
-2026-11-12 在本分支执行 `./mvnw verify`：108 项 Java 测试全部通过，无跳过；前端 14 项测试通过。[docs](docs) 目录中的验证报告与 [缓存性能记录](docs/cache-benchmark.json) 生成于迁移前（Java 8、MyBatis-Plus、五层缓存），作为历史参考保留，不代表当前版本的性能数据。
+2026-11-12 在本分支执行 `./mvnw verify`：111 项 Java 测试全部通过，无跳过；前端 14 项测试通过。[docs](docs) 目录中的验证报告与 [缓存性能记录](docs/cache-benchmark.json) 生成于迁移前（Java 8、MyBatis-Plus、五层缓存），作为历史参考保留，不代表当前版本的性能数据。
 
 ### 可选监控与链路追踪
 
