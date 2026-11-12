@@ -346,7 +346,8 @@ select {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-position: center 60%;
+  object-fit: cover;
+  object-position: center 55%;
 }
 .hero::after {
   content: "";
@@ -355,9 +356,10 @@ select {
   background: linear-gradient(
     90deg,
     #f3f8f7 0%,
-    rgb(243 248 247 / 94%) 24%,
-    rgb(243 248 247 / 30%) 49%,
-    transparent 65%
+    rgb(243 248 247 / 96%) 38%,
+    rgb(243 248 247 / 72%) 52%,
+    rgb(243 248 247 / 12%) 68%,
+    transparent 78%
   );
   pointer-events: none;
 }

@@ -7,6 +7,7 @@
 
  All businesses, people and reviews below are fictional. Shop coordinates are
  real Vancouver-area neighbourhoods (x = longitude, y = latitude).
+ Photos are from Unsplash (see frontend/assets/photos/CREDITS.md).
 */
 
 SET NAMES utf8mb4;
@@ -33,10 +34,10 @@ CREATE TABLE `tb_blog`  (
 -- ----------------------------
 -- Records of tb_blog
 -- ----------------------------
-INSERT INTO `tb_blog` VALUES (4, 1, 2, 'A $6 surprise bag from Tidewater Bakehouse was the best deal of my week', '/assets/shops/bag.svg,/assets/shops/bakery.svg', 'Grabbed the 5:30 PM drop on my way home through Gastown. Pickup was a ten-minute window right before closing and the staff had the bags ready at the counter.\n\nInside: two almond croissants, half a sourdough loaf, a cardamom bun and a slightly squashed cinnamon knot. Easily $20 of pastry for $6, and all of it would have been thrown out an hour later.\n\nTip: the drops go fast. Follow the shop so the new drop shows up in your feed.', 00000013, 00000004, '2026-10-18 01:50:01', '2026-10-18 01:50:01');
-INSERT INTO `tb_blog` VALUES (5, 7, 2, 'Golden Lantern: weekend dim sum worth the wait in Chinatown', '/assets/shops/dimsum.svg', 'Came for Saturday dim sum with four friends. The har gow wrappers were thin and the shrimp snapped, the siu mai were generous and the baked BBQ pork buns disappeared first.\n\nWe waited about 20 minutes at 11 AM; earlier is quieter. Around $28 per person with tea.\n\nThey also post an evening surplus bag with whatever buns and dumplings are left. Worth trying for next-day lunch.', 00000009, 00000002, '2026-10-25 19:12:44', '2026-10-25 19:12:44');
-INSERT INTO `tb_blog` VALUES (6, 15, 1, 'End-of-day deli bag from Granville Island Provisions', '/assets/shops/deli.svg,/assets/shops/bag.svg', 'Picked up a deli surprise bag after a walk around the island: a turkey and brie sandwich, a tub of marinated olives, a wedge of aged cheddar and two ripe pears.\n\nThe pickup window was 6:30 to 7:00 PM and it was ready under my name. Great value for a picnic at Vanier Park the next day.', 00000011, 00000001, '2026-11-02 02:05:47', '2026-11-02 02:05:47');
-INSERT INTO `tb_blog` VALUES (7, 11, 1, 'Seawall Brunch Co. after a morning run on English Bay', '/assets/shops/brunch.svg', 'Crab cake benny with crispy potatoes and a proper flat white, with a view of the water. Service was quick even on a Sunday.\n\nUsed the weekday brunch credit deal and saved about $9 for two. Book ahead on weekends.', 00000007, 00000000, '2026-11-09 18:30:12', '2026-11-09 18:30:12');
+INSERT INTO `tb_blog` VALUES (4, 1, 2, 'A $6 surprise bag from Tidewater Bakehouse was the best deal of my week', '/assets/photos/bag.jpg,/assets/photos/bakery-1.jpg', 'Grabbed the 5:30 PM drop on my way home through Gastown. Pickup was a ten-minute window right before closing and the staff had the bags ready at the counter.\n\nInside: two almond croissants, half a sourdough loaf, a cardamom bun and a slightly squashed cinnamon knot. Easily $20 of pastry for $6, and all of it would have been thrown out an hour later.\n\nTip: the drops go fast. Follow the shop so the new drop shows up in your feed.', 00000013, 00000004, '2026-10-18 01:50:01', '2026-10-18 01:50:01');
+INSERT INTO `tb_blog` VALUES (5, 7, 2, 'Golden Lantern: weekend dim sum worth the wait in Chinatown', '/assets/photos/dimsum-1.jpg,/assets/photos/dimsum-2.jpg', 'Came for Saturday dim sum with four friends. The har gow wrappers were thin and the shrimp snapped, the siu mai were generous and the baked BBQ pork buns disappeared first.\n\nWe waited about 20 minutes at 11 AM; earlier is quieter. Around $28 per person with tea.\n\nThey also post an evening surplus bag with whatever buns and dumplings are left. Worth trying for next-day lunch.', 00000009, 00000002, '2026-10-25 19:12:44', '2026-10-25 19:12:44');
+INSERT INTO `tb_blog` VALUES (6, 15, 1, 'End-of-day deli bag from Granville Island Provisions', '/assets/photos/deli-2.jpg,/assets/photos/bag.jpg', 'Picked up a deli surprise bag after a walk around the island: a turkey and brie sandwich, a tub of marinated olives, a wedge of aged cheddar and two ripe pears.\n\nThe pickup window was 6:30 to 7:00 PM and it was ready under my name. Great value for a picnic at Vanier Park the next day.', 00000011, 00000001, '2026-11-02 02:05:47', '2026-11-02 02:05:47');
+INSERT INTO `tb_blog` VALUES (7, 11, 1, 'Seawall Brunch Co. after a morning run on English Bay', '/assets/photos/brunch-1.jpg', 'Crab cake benny with crispy potatoes and a proper flat white, with a view of the water. Service was quick even on a Sunday.\n\nUsed the weekday brunch credit deal and saved about $9 for two. Book ahead on weekends.', 00000007, 00000000, '2026-11-09 18:30:12', '2026-11-09 18:30:12');
 
 -- ----------------------------
 -- Table structure for tb_blog_comments
@@ -121,22 +122,22 @@ CREATE TABLE `tb_shop`  (
 -- ----------------------------
 -- Records of tb_shop
 -- ----------------------------
-INSERT INTO `tb_shop` VALUES (1, 'Tidewater Bakehouse', 1, '/assets/shops/bakery.svg,/assets/shops/bag.svg', 'Gastown', '212 Carrall St, Vancouver', -123.1043, 49.2836, 14, 0000004215, 0000000812, 47, '07:00-18:00', '2026-09-01 16:10:39', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (2, 'Kits Crumb & Co.', 1, '/assets/shops/bakery.svg', 'Kitsilano', '2185 W 4th Ave, Vancouver', -123.1580, 49.2683, 12, 0000003120, 0000000640, 46, '07:30-17:30', '2026-09-01 16:12:10', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (3, 'Northshore Roast', 2, '/assets/shops/cafe.svg', 'Lonsdale Quay', '128 Esplanade W, North Vancouver', -123.0815, 49.3104, 9, 0000005208, 0000000930, 45, '06:30-19:00', '2026-09-01 16:15:05', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (4, 'Main Street Grind', 2, '/assets/shops/cafe.svg', 'Mount Pleasant', '2412 Main St, Vancouver', -123.1007, 49.2638, 8, 0000006011, 0000001104, 46, '07:00-20:00', '2026-09-01 16:17:15', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (5, 'Harbour Light Sushi', 3, '/assets/shops/sushi.svg', 'Coal Harbour', '575 Bute St, Vancouver', -123.1225, 49.2895, 32, 0000003519, 0000000729, 47, '11:30-21:30', '2026-09-01 16:20:58', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (6, 'Robson Nori Bar', 3, '/assets/shops/sushi.svg', 'West End', '1688 Robson St, Vancouver', -123.1345, 49.2905, 26, 0000004125, 0000000764, 45, '11:00-22:00', '2026-09-01 16:24:53', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (7, 'Golden Lantern Dim Sum', 4, '/assets/shops/dimsum.svg,/assets/shops/bag.svg', 'Chinatown', '268 Keefer St, Vancouver', -123.0990, 49.2794, 28, 0000009531, 0000001324, 46, '09:00-21:00', '2026-09-01 16:40:52', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (8, 'Aberdeen Steamer House', 4, '/assets/shops/dimsum.svg', 'Richmond', '8391 Alexandra Rd, Richmond', -123.1335, 49.1840, 30, 0000002406, 0000000606, 47, '10:00-22:00', '2026-09-01 16:51:06', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (9, 'Commercial Drive Slice', 5, '/assets/shops/pizza.svg', 'Commercial Drive', '1520 Commercial Dr, Vancouver', -123.0695, 49.2700, 20, 0000002763, 0000000563, 45, '11:30-23:00', '2026-09-01 16:53:59', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (10, 'Yaletown Forno', 5, '/assets/shops/pizza.svg', 'Yaletown', '1130 Mainland St, Vancouver', -123.1205, 49.2756, 34, 0000002891, 0000000502, 46, '12:00-22:30', '2026-09-01 17:25:16', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (11, 'Seawall Brunch Co.', 6, '/assets/shops/brunch.svg', 'English Bay', '1750 Beach Ave, Vancouver', -123.1415, 49.2862, 25, 0000005977, 0000000884, 45, '08:00-15:00', '2026-09-01 17:29:02', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (12, 'Kerrisdale Morning Table', 6, '/assets/shops/brunch.svg', 'Kerrisdale', '2210 W 41st Ave, Vancouver', -123.1560, 49.2342, 22, 0000001444, 0000000235, 44, '08:00-14:30', '2026-09-01 17:34:34', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (13, 'Greenroot Kitchen', 7, '/assets/shops/plant.svg,/assets/shops/bag.svg', 'Mount Pleasant', '18 E Broadway, Vancouver', -123.1015, 49.2630, 18, 0000003997, 0000000657, 46, '11:00-21:00', '2026-09-01 17:38:54', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (14, 'False Creek Grain Bowl', 7, '/assets/shops/plant.svg', 'Olympic Village', '1755 Manitoba St, Vancouver', -123.1080, 49.2690, 16, 0000001771, 0000000385, 45, '10:30-20:00', '2026-09-01 17:48:54', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (15, 'Granville Island Provisions', 8, '/assets/shops/deli.svg,/assets/shops/bag.svg', 'Granville Island', '1585 Johnston St, Vancouver', -123.1340, 49.2712, 15, 0000004890, 0000000911, 47, '09:00-19:00', '2026-09-01 17:52:20', '2026-11-01 17:32:19');
-INSERT INTO `tb_shop` VALUES (16, 'Metrotown Corner Deli', 8, '/assets/shops/deli.svg', 'Burnaby', '6010 Kingsway, Burnaby', -122.9990, 49.2255, 13, 0000002210, 0000000318, 44, '08:00-20:00', '2026-09-01 17:55:41', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (1, 'Tidewater Bakehouse', 1, '/assets/photos/bakery-1.jpg,/assets/photos/bag.jpg', 'Gastown', '212 Carrall St, Vancouver', -123.1043, 49.2836, 14, 0000004215, 0000000812, 47, '07:00-18:00', '2026-09-01 16:10:39', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (2, 'Kits Crumb & Co.', 1, '/assets/photos/bakery-2.jpg,/assets/photos/bakery-1.jpg', 'Kitsilano', '2185 W 4th Ave, Vancouver', -123.1580, 49.2683, 12, 0000003120, 0000000640, 46, '07:30-17:30', '2026-09-01 16:12:10', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (3, 'Northshore Roast', 2, '/assets/photos/cafe-1.jpg,/assets/photos/cafe-2.jpg', 'Lonsdale Quay', '128 Esplanade W, North Vancouver', -123.0815, 49.3104, 9, 0000005208, 0000000930, 45, '06:30-19:00', '2026-09-01 16:15:05', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (4, 'Main Street Grind', 2, '/assets/photos/cafe-2.jpg,/assets/photos/cafe-1.jpg', 'Mount Pleasant', '2412 Main St, Vancouver', -123.1007, 49.2638, 8, 0000006011, 0000001104, 46, '07:00-20:00', '2026-09-01 16:17:15', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (5, 'Harbour Light Sushi', 3, '/assets/photos/sushi-1.jpg,/assets/photos/sushi-2.jpg', 'Coal Harbour', '575 Bute St, Vancouver', -123.1225, 49.2895, 32, 0000003519, 0000000729, 47, '11:30-21:30', '2026-09-01 16:20:58', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (6, 'Robson Nori Bar', 3, '/assets/photos/sushi-2.jpg,/assets/photos/sushi-1.jpg', 'West End', '1688 Robson St, Vancouver', -123.1345, 49.2905, 26, 0000004125, 0000000764, 45, '11:00-22:00', '2026-09-01 16:24:53', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (7, 'Golden Lantern Dim Sum', 4, '/assets/photos/dimsum-1.jpg,/assets/photos/dimsum-2.jpg', 'Chinatown', '268 Keefer St, Vancouver', -123.0990, 49.2794, 28, 0000009531, 0000001324, 46, '09:00-21:00', '2026-09-01 16:40:52', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (8, 'Aberdeen Steamer House', 4, '/assets/photos/dimsum-2.jpg,/assets/photos/dimsum-1.jpg', 'Richmond', '8391 Alexandra Rd, Richmond', -123.1335, 49.1840, 30, 0000002406, 0000000606, 47, '10:00-22:00', '2026-09-01 16:51:06', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (9, 'Commercial Drive Slice', 5, '/assets/photos/pizza-1.jpg,/assets/photos/pizza-2.jpg', 'Commercial Drive', '1520 Commercial Dr, Vancouver', -123.0695, 49.2700, 20, 0000002763, 0000000563, 45, '11:30-23:00', '2026-09-01 16:53:59', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (10, 'Yaletown Forno', 5, '/assets/photos/pizza-2.jpg,/assets/photos/pizza-1.jpg', 'Yaletown', '1130 Mainland St, Vancouver', -123.1205, 49.2756, 34, 0000002891, 0000000502, 46, '12:00-22:30', '2026-09-01 17:25:16', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (11, 'Seawall Brunch Co.', 6, '/assets/photos/brunch-1.jpg,/assets/photos/brunch-2.jpg', 'English Bay', '1750 Beach Ave, Vancouver', -123.1415, 49.2862, 25, 0000005977, 0000000884, 45, '08:00-15:00', '2026-09-01 17:29:02', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (12, 'Kerrisdale Morning Table', 6, '/assets/photos/brunch-2.jpg,/assets/photos/brunch-1.jpg', 'Kerrisdale', '2210 W 41st Ave, Vancouver', -123.1560, 49.2342, 22, 0000001444, 0000000235, 44, '08:00-14:30', '2026-09-01 17:34:34', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (13, 'Greenroot Kitchen', 7, '/assets/photos/plant-1.jpg,/assets/photos/plant-2.jpg', 'Mount Pleasant', '18 E Broadway, Vancouver', -123.1015, 49.2630, 18, 0000003997, 0000000657, 46, '11:00-21:00', '2026-09-01 17:38:54', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (14, 'False Creek Grain Bowl', 7, '/assets/photos/plant-2.jpg,/assets/photos/plant-1.jpg', 'Olympic Village', '1755 Manitoba St, Vancouver', -123.1080, 49.2690, 16, 0000001771, 0000000385, 45, '10:30-20:00', '2026-09-01 17:48:54', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (15, 'Granville Island Provisions', 8, '/assets/photos/deli-1.jpg,/assets/photos/deli-2.jpg', 'Granville Island', '1585 Johnston St, Vancouver', -123.1340, 49.2712, 15, 0000004890, 0000000911, 47, '09:00-19:00', '2026-09-01 17:52:20', '2026-11-01 17:32:19');
+INSERT INTO `tb_shop` VALUES (16, 'Metrotown Corner Deli', 8, '/assets/photos/deli-2.jpg,/assets/photos/deli-1.jpg', 'Burnaby', '6010 Kingsway, Burnaby', -122.9990, 49.2255, 13, 0000002210, 0000000318, 44, '08:00-20:00', '2026-09-01 17:55:41', '2026-11-01 17:32:19');
 
 -- ----------------------------
 -- Table structure for tb_shop_type
@@ -155,14 +156,14 @@ CREATE TABLE `tb_shop_type`  (
 -- ----------------------------
 -- Records of tb_shop_type
 -- ----------------------------
-INSERT INTO `tb_shop_type` VALUES (1, 'Bakeries', '/assets/shops/bakery.svg', 1, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (2, 'Cafés', '/assets/shops/cafe.svg', 2, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (3, 'Sushi & Japanese', '/assets/shops/sushi.svg', 3, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (4, 'Dim Sum & Chinese', '/assets/shops/dimsum.svg', 4, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (5, 'Pizza & Italian', '/assets/shops/pizza.svg', 5, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (6, 'Brunch', '/assets/shops/brunch.svg', 6, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (7, 'Plant-based', '/assets/shops/plant.svg', 7, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
-INSERT INTO `tb_shop_type` VALUES (8, 'Grocery & Deli', '/assets/shops/deli.svg', 8, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (1, 'Bakeries', '/assets/photos/bakery-1.jpg', 1, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (2, 'Cafés', '/assets/photos/cafe-1.jpg', 2, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (3, 'Sushi & Japanese', '/assets/photos/sushi-1.jpg', 3, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (4, 'Dim Sum & Chinese', '/assets/photos/dimsum-1.jpg', 4, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (5, 'Pizza & Italian', '/assets/photos/pizza-1.jpg', 5, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (6, 'Brunch', '/assets/photos/brunch-1.jpg', 6, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (7, 'Plant-based', '/assets/photos/plant-1.jpg', 7, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
+INSERT INTO `tb_shop_type` VALUES (8, 'Grocery & Deli', '/assets/photos/deli-1.jpg', 8, '2026-09-01 16:00:00', '2026-09-01 16:00:00');
 
 -- ----------------------------
 -- Table structure for tb_user

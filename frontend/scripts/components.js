@@ -138,7 +138,7 @@ Vue.component("voucher-card", {
   },
   template: `
     <article class="voucher-card" :class="{ 'drop-card': voucher.type }">
-      <div class="ticket-mark"><img v-if="voucher.type" class="bag-mark" src="/assets/shops/bag.svg" alt=""><i v-else class="el-icon-tickets" aria-hidden="true"></i></div>
+      <div class="ticket-mark"><img v-if="voucher.type" class="bag-mark" src="/assets/photos/bag.jpg" alt=""><i v-else class="el-icon-tickets" aria-hidden="true"></i></div>
       <div class="voucher-main"><a v-if="shopName" :href="'/shop-detail.html?id=' + voucher.shopId" class="eyebrow">{{ shopName }}</a><span class="voucher-kind">{{ voucher.type ? 'Surprise bag' : 'Deal' }}</span><h3>{{ voucher.title }}</h3><p>{{ voucher.subTitle || 'See the shop for terms of use.' }}</p><div class="voucher-price">\$<strong>{{ money(voucher.payValue) }}</strong><span>{{ voucher.type ? 'Worth' : 'Value' }} \${{ money(voucher.actualValue) }}</span><span v-if="voucher.type" class="tag" :class="'sale-' + saleState.kind">{{ saleState.text }}</span></div><p v-if="voucher.type && pickup" class="voucher-pickup"><i class="el-icon-time" aria-hidden="true"></i>Pick up {{ pickup }}</p></div>
       <button class="button primary" :disabled="!available || busy" @click="$emit('claim', voucher)">{{ label }}</button>
     </article>`,

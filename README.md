@@ -142,7 +142,7 @@ dev/                               Compose stack, Debezium connector, monitoring
 ## Scope and limitations
 
 - Starts from a well-known Spring Boot course scaffold (Heima Dianping), re-themed as a Vancouver product. The reliability, caching, messaging, security and testing layers described above extend that base; `hmdp` remains the internal code name in packages and configuration.
-- All shops, people and reviews are fictional. Shop coordinates are real Vancouver-area neighbourhoods, and the illustrations are original.
+- All shops, people and reviews are fictional. Shop coordinates are real Vancouver-area neighbourhoods; photos are from Unsplash ([credits](frontend/assets/photos/CREDITS.md)) and do not depict the fictional shops.
 - Runs as a single-node Docker Compose stack. There is no multi-node high availability, disaster recovery or production traffic, and no load-test results are published for the current version.
 - Payment is a disabled-by-default local simulation. Real payments, refunds and SMS are out of scope.
 
