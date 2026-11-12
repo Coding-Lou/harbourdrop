@@ -29,8 +29,12 @@ public interface MessageRepository extends Repository<MessageInboxEntry, Message
           ORDER BY b.id LIMIT 30
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectOrderProgress(
+  List<Map<String, Object>> selectOrderProgressTuples(
       @Param("orderId") Long orderId, @Param("userId") Long userId);
+
+  default List<Map<String, Object>> selectOrderProgress(Long orderId, Long userId) {
+    return Rows.mutable(selectOrderProgressTuples(orderId, userId));
+  }
 
   @Query(
       value =
@@ -40,7 +44,11 @@ public interface MessageRepository extends Repository<MessageInboxEntry, Message
           ORDER BY created_at DESC LIMIT 100
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectFailures();
+  List<Map<String, Object>> selectFailuresTuples();
+
+  default List<Map<String, Object>> selectFailures() {
+    return Rows.mutable(selectFailuresTuples());
+  }
 
   @Query(
       value =

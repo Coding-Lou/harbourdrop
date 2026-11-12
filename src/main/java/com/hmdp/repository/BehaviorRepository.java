@@ -24,7 +24,11 @@ public interface BehaviorRepository extends Repository<BehaviorEventRecord, Stri
           ORDER BY created_at LIMIT 100
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectUnsentEvents();
+  List<Map<String, Object>> selectUnsentEventsTuples();
+
+  default List<Map<String, Object>> selectUnsentEvents() {
+    return Rows.mutable(selectUnsentEventsTuples());
+  }
 
   @Query(
       value =
@@ -34,7 +38,11 @@ public interface BehaviorRepository extends Repository<BehaviorEventRecord, Stri
           ORDER BY created_at DESC LIMIT 100
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectFailures();
+  List<Map<String, Object>> selectFailuresTuples();
+
+  default List<Map<String, Object>> selectFailures() {
+    return Rows.mutable(selectFailuresTuples());
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -91,7 +99,11 @@ public interface BehaviorRepository extends Repository<BehaviorEventRecord, Stri
           WHERE event_id=:eventId
           """,
       nativeQuery = true)
-  Map<String, Object> selectEvent(@Param("eventId") String eventId);
+  Map<String, Object> selectEventTuples(@Param("eventId") String eventId);
+
+  default Map<String, Object> selectEvent(String eventId) {
+    return Rows.mutable(selectEventTuples(eventId));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -140,12 +152,17 @@ public interface BehaviorRepository extends Repository<BehaviorEventRecord, Stri
           ORDER BY heat DESC,b.shop_id LIMIT :limit
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectRanking(
+  List<Map<String, Object>> selectRankingTuples(
       @Param("uvFromMs") Long uvFromMs,
       @Param("uvToMs") Long uvToMs,
       @Param("bucketFromMs") Long bucketFromMs,
       @Param("bucketToMs") Long bucketToMs,
       @Param("limit") Integer limit);
+
+  default List<Map<String, Object>> selectRanking(
+      Long uvFromMs, Long uvToMs, Long bucketFromMs, Long bucketToMs, Integer limit) {
+    return Rows.mutable(selectRankingTuples(uvFromMs, uvToMs, bucketFromMs, bucketToMs, limit));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -171,7 +188,11 @@ public interface BehaviorRepository extends Repository<BehaviorEventRecord, Stri
           ORDER BY created_at,event_id LIMIT 10 FOR UPDATE SKIP LOCKED
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectClaimableEvents();
+  List<Map<String, Object>> selectClaimableEventsTuples();
+
+  default List<Map<String, Object>> selectClaimableEvents() {
+    return Rows.mutable(selectClaimableEventsTuples());
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)

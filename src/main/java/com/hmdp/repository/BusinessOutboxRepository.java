@@ -67,7 +67,11 @@ public interface BusinessOutboxRepository extends Repository<BusinessOutboxTask,
           ORDER BY id LIMIT 100
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectUnfinishedEvents();
+  List<Map<String, Object>> selectUnfinishedEventsTuples();
+
+  default List<Map<String, Object>> selectUnfinishedEvents() {
+    return Rows.mutable(selectUnfinishedEventsTuples());
+  }
 
   @Query(
       value =

@@ -3,7 +3,10 @@ package com.hmdp.repository;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,6 +52,22 @@ public final class Rows {
       return new Timestamp(date.getTime());
     }
     throw new IllegalArgumentException("Not a timestamp: " + value.getClass().getName());
+  }
+
+  /**
+   * Mutable copy of a query row. Spring Data returns read-only tuple maps, while callers (as with
+   * MyBatis before) may enrich a row before returning it.
+   */
+  public static Map<String, Object> mutable(Map<String, Object> row) {
+    return row == null ? null : new LinkedHashMap<>(row);
+  }
+
+  public static List<Map<String, Object>> mutable(List<Map<String, Object>> rows) {
+    List<Map<String, Object>> copies = new ArrayList<>(rows.size());
+    for (Map<String, Object> row : rows) {
+      copies.add(mutable(row));
+    }
+    return copies;
   }
 
   public static Long longOf(Map<String, Object> row, String column) {

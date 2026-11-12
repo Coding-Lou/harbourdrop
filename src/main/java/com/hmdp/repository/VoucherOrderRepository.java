@@ -115,7 +115,11 @@ public interface VoucherOrderRepository
           WHERE id=:orderId
           """,
       nativeQuery = true)
-  Map<String, Object> selectDeadline(@Param("orderId") Long orderId);
+  Map<String, Object> selectDeadlineTuples(@Param("orderId") Long orderId);
+
+  default Map<String, Object> selectDeadline(Long orderId) {
+    return Rows.mutable(selectDeadlineTuples(orderId));
+  }
 
   @Query(
       value =
@@ -126,7 +130,11 @@ public interface VoucherOrderRepository
           WHERE id=:orderId FOR UPDATE
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectExpiryStateForUpdate(@Param("orderId") Long orderId);
+  List<Map<String, Object>> selectExpiryStateForUpdateTuples(@Param("orderId") Long orderId);
+
+  default List<Map<String, Object>> selectExpiryStateForUpdate(Long orderId) {
+    return Rows.mutable(selectExpiryStateForUpdateTuples(orderId));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -159,8 +167,12 @@ public interface VoucherOrderRepository
           WHERE user_id=:userId AND voucher_id=:voucherId FOR UPDATE
           """,
       nativeQuery = true)
-  List<Map<String, Object>> lockOrdinarySlot(
+  List<Map<String, Object>> lockOrdinarySlotTuples(
       @Param("userId") Long userId, @Param("voucherId") Long voucherId);
+
+  default List<Map<String, Object>> lockOrdinarySlot(Long userId, Long voucherId) {
+    return Rows.mutable(lockOrdinarySlotTuples(userId, voucherId));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -185,5 +197,9 @@ public interface VoucherOrderRepository
           WHERE id=:orderId
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectBehaviorSnapshot(@Param("orderId") Long orderId);
+  List<Map<String, Object>> selectBehaviorSnapshotTuples(@Param("orderId") Long orderId);
+
+  default List<Map<String, Object>> selectBehaviorSnapshot(Long orderId) {
+    return Rows.mutable(selectBehaviorSnapshotTuples(orderId));
+  }
 }

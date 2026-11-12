@@ -66,8 +66,13 @@ public interface FollowRepository extends JpaRepository<Follow, Long>, InsertRep
           ORDER BY id LIMIT 200
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectFanBatch(
+  List<Map<String, Object>> selectFanBatchTuples(
       @Param("authorId") Long authorId,
       @Param("cursorId") Long cursorId,
       @Param("publishedAt") Timestamp publishedAt);
+
+  default List<Map<String, Object>> selectFanBatch(
+      Long authorId, Long cursorId, Timestamp publishedAt) {
+    return Rows.mutable(selectFanBatchTuples(authorId, cursorId, publishedAt));
+  }
 }

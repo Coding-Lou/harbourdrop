@@ -27,7 +27,11 @@ public interface SeckillVoucherRepository
           LEFT JOIN tb_seckill_activity a ON a.voucher_id=sv.voucher_id
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectPublicationStates();
+  List<Map<String, Object>> selectPublicationStatesTuples();
+
+  default List<Map<String, Object>> selectPublicationStates() {
+    return Rows.mutable(selectPublicationStatesTuples());
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -75,7 +79,11 @@ public interface SeckillVoucherRepository
           WHERE voucher_id=:voucherId
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectInventory(@Param("voucherId") Long voucherId);
+  List<Map<String, Object>> selectInventoryTuples(@Param("voucherId") Long voucherId);
+
+  default List<Map<String, Object>> selectInventory(Long voucherId) {
+    return Rows.mutable(selectInventoryTuples(voucherId));
+  }
 
   @Query(
       value =

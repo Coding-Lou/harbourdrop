@@ -23,7 +23,11 @@ public interface SeckillReservationRepository extends Repository<SeckillReservat
           ORDER BY created_at DESC LIMIT 100
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectDeadLetters();
+  List<Map<String, Object>> selectDeadLettersTuples();
+
+  default List<Map<String, Object>> selectDeadLetters() {
+    return Rows.mutable(selectDeadLettersTuples());
+  }
 
   @Query(
       value =
@@ -184,8 +188,12 @@ public interface SeckillReservationRepository extends Repository<SeckillReservat
           WHERE order_id=:orderId AND user_id=:userId
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectOwnedRequest(
+  List<Map<String, Object>> selectOwnedRequestTuples(
       @Param("orderId") Long orderId, @Param("userId") Long userId);
+
+  default List<Map<String, Object>> selectOwnedRequest(Long orderId, Long userId) {
+    return Rows.mutable(selectOwnedRequestTuples(orderId, userId));
+  }
 
   @Query(
       value =
@@ -205,7 +213,11 @@ public interface SeckillReservationRepository extends Repository<SeckillReservat
           WHERE voucher_id=:voucherId AND state='SUCCESS'
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectSuccessfulBuyers(@Param("voucherId") Long voucherId);
+  List<Map<String, Object>> selectSuccessfulBuyersTuples(@Param("voucherId") Long voucherId);
+
+  default List<Map<String, Object>> selectSuccessfulBuyers(Long voucherId) {
+    return Rows.mutable(selectSuccessfulBuyersTuples(voucherId));
+  }
 
   @Query(
       value =
@@ -254,5 +266,9 @@ public interface SeckillReservationRepository extends Repository<SeckillReservat
           ORDER BY updated_at DESC LIMIT 100
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectReviewRequests();
+  List<Map<String, Object>> selectReviewRequestsTuples();
+
+  default List<Map<String, Object>> selectReviewRequests() {
+    return Rows.mutable(selectReviewRequestsTuples());
+  }
 }

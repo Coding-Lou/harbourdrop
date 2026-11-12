@@ -20,6 +20,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -117,6 +118,28 @@ class ArchitectureTest {
       }
     }
     assertTrue(checked > 100, "expected the migrated native queries to be checked: " + checked);
+  }
+
+  @Test
+  void rawTupleRowsAreNeverExposedUnderTheirPublicName() {
+    // Spring Data's tuple maps are read-only; callers must get Rows.mutable(...) copies through a
+    // default method, so a native query returning maps must be named *Tuples or *Row(s).
+    for (var type : production) {
+      if (!type.getPackageName().equals("com.hmdp.repository") || !type.isInterface()) {
+        continue;
+      }
+      for (Method method : type.reflect().getDeclaredMethods()) {
+        boolean returnsMaps =
+            Map.class.isAssignableFrom(method.getReturnType())
+                || method.getGenericReturnType().getTypeName().contains("java.util.Map");
+        if (method.isAnnotationPresent(Query.class) && returnsMaps) {
+          String name = method.getName();
+          assertTrue(
+              name.endsWith("Tuples") || name.endsWith("Row") || name.endsWith("Rows"),
+              method.toString());
+        }
+      }
+    }
   }
 
   @Test

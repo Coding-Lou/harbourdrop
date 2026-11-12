@@ -41,7 +41,11 @@ public interface BlogRepository extends JpaRepository<Blog, Long>, InsertReposit
           WHERE id=:blogId FOR UPDATE
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectIdForUpdate(@Param("blogId") Long blogId);
+  List<Map<String, Object>> selectIdForUpdateTuples(@Param("blogId") Long blogId);
+
+  default List<Map<String, Object>> selectIdForUpdate(Long blogId) {
+    return Rows.mutable(selectIdForUpdateTuples(blogId));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -128,6 +132,10 @@ public interface BlogRepository extends JpaRepository<Blog, Long>, InsertReposit
           WHERE blog_id=:blogId AND user_id=:userId
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectLikeTimestamp(
+  List<Map<String, Object>> selectLikeTimestampTuples(
       @Param("blogId") Long blogId, @Param("userId") Long userId);
+
+  default List<Map<String, Object>> selectLikeTimestamp(Long blogId, Long userId) {
+    return Rows.mutable(selectLikeTimestampTuples(blogId, userId));
+  }
 }

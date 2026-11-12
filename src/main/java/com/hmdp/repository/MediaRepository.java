@@ -34,7 +34,11 @@ public interface MediaRepository extends Repository<MediaOwner, String> {
           WHERE path=:path FOR UPDATE
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectOwnerForUpdate(@Param("path") String path);
+  List<Map<String, Object>> selectOwnerForUpdateTuples(@Param("path") String path);
+
+  default List<Map<String, Object>> selectOwnerForUpdate(String path) {
+    return Rows.mutable(selectOwnerForUpdateTuples(path));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
@@ -55,7 +59,11 @@ public interface MediaRepository extends Repository<MediaOwner, String> {
           WHERE path=:path LIMIT 1 FOR UPDATE
           """,
       nativeQuery = true)
-  List<Map<String, Object>> selectReferencesForUpdate(@Param("path") String path);
+  List<Map<String, Object>> selectReferencesForUpdateTuples(@Param("path") String path);
+
+  default List<Map<String, Object>> selectReferencesForUpdate(String path) {
+    return Rows.mutable(selectReferencesForUpdateTuples(path));
+  }
 
   @Transactional
   @Modifying(flushAutomatically = true, clearAutomatically = true)
