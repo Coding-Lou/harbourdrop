@@ -24,7 +24,7 @@ import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 
 @SpringBootTest
-class HmDianPingApplicationTests extends IntegrationTestBase {
+class HarbourDropApplicationTests extends IntegrationTestBase {
 
   @Resource
   private CacheClient cacheClient;

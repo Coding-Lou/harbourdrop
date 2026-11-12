@@ -109,7 +109,7 @@ Result on 2026-11-12: 113 backend tests and 17 frontend tests passing, none skip
 Requires Docker with Compose v2. All images run natively on x86-64 and Apple Silicon.
 
 ```bash
-docker compose -p hm-dianping -f dev/docker-compose.yml up -d
+docker compose -p harbourdrop -f dev/docker-compose.yml up -d
 ```
 
 | URL | What |

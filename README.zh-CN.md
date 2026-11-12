@@ -82,9 +82,9 @@ flowchart LR
 准备已启动的 Docker 与 Compose v2，并能下载项目镜像和 Maven 依赖。所有镜像都提供 arm64 版本，Apple Silicon 上原生运行。以下命令在项目根目录执行：
 
 ```bash
-docker compose -p hm-dianping -f dev/docker-compose.yml up -d
-docker compose -p hm-dianping -f dev/docker-compose.yml ps -a
-docker compose -p hm-dianping -f dev/docker-compose.yml logs -f java
+docker compose -p harbourdrop -f dev/docker-compose.yml up -d
+docker compose -p harbourdrop -f dev/docker-compose.yml ps -a
+docker compose -p harbourdrop -f dev/docker-compose.yml logs -f java
 ```
 
 完整环境启动 MySQL、Redis、Kafka、Kafka Connect（Debezium）、Mailpit、Java 和 Nginx。首次初始化导入演示数据、创建 Kafka topic、注册 Debezium 连接器，并由 Java 执行 Flyway 增量迁移。`kafka-init`、`cdc-user-init`、`connect-init`、`otel-agent-init` 正常完成后退出是预期行为。
@@ -105,10 +105,10 @@ curl -i 'http://127.0.0.1:8081/shop-type/list'
 curl -i 'http://127.0.0.1:8080/api/shop-type/list'
 ```
 
-浏览器经 Nginx 请求时加 `/api`，直接请求 Java 时不加。Java 容器重建后，如果网页请求返回 502，执行 `docker compose -p hm-dianping -f dev/docker-compose.yml restart web` 让 Nginx 重新解析地址。数据卷保留数据库和消息数据，日常停止使用：
+浏览器经 Nginx 请求时加 `/api`，直接请求 Java 时不加。Java 容器重建后，如果网页请求返回 502，执行 `docker compose -p harbourdrop -f dev/docker-compose.yml restart web` 让 Nginx 重新解析地址。数据卷保留数据库和消息数据，日常停止使用：
 
 ```bash
-docker compose -p hm-dianping -f dev/docker-compose.yml down
+docker compose -p harbourdrop -f dev/docker-compose.yml down
 ```
 
 业务环境不使用 `down -v` 清理。上传图片默认保存在项目内被 git 忽略的 `dev/data/uploads`，可用 `HMDP_UPLOAD_HOST_DIR` 指向其他目录（例如课程配套的图片目录）。在 IDE 中单独启动 Java 需要 JDK 21，执行 `./mvnw spring-boot:run`；这样不会自动启动网页、Kafka 或 Debezium，详见 [环境搭建](wiki/02-环境搭建与启动.md)。
@@ -170,7 +170,7 @@ docker compose -p hm-dianping -f dev/docker-compose.yml down
 ## 项目结构与开发规范
 
 ```text
-hm-dianping/
+harbourdrop/
 ├── src/main/java/com/hmdp/
 │   ├── controller/       HTTP 接口
 │   ├── service/          业务接口与实现
@@ -229,7 +229,7 @@ npm --prefix frontend test
 
 ```bash
 HMDP_TRACING_ENABLED=true \
-  docker compose -p hm-dianping -f dev/docker-compose.yml --profile observability up -d
+  docker compose -p harbourdrop -f dev/docker-compose.yml --profile observability up -d
 ```
 
 `observability` profile 启动 [Prometheus :9091](http://127.0.0.1:9091/)、[Alertmanager :9094](http://127.0.0.1:9094/) 和 [Jaeger :16686](http://127.0.0.1:16686/)。只需要指标时可以用 `--profile monitoring`。打开追踪后，Jaeger 中服务名为 `hmdp-api`，可以看到 HTTP、Hibernate/JDBC、Redis 和 Kafka 生产与消费的 span。Outbox 是异步边界，业务提交与后续投递属于不同的调用链。

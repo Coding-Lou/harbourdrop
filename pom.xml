@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.hmdp</groupId>
-    <artifactId>hm-dianping</artifactId>
+    <artifactId>harbourdrop</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>hm-dianping</name>
-    <description>Local-life reviews and flash-sale platform</description>
+    <name>harbourdrop</name>
+    <description>Vancouver surplus-food drops and restaurant deals</description>
     <properties>
         <java.version>21</java.version>
     </properties>

@@ -38,7 +38,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'target/hmdp-cloud-release.tar.gz')
     args = parser.parse_args()
-    jar = ROOT / 'target/hm-dianping-0.0.1-SNAPSHOT.jar'
+    jar = ROOT / 'target/harbourdrop-0.0.1-SNAPSHOT.jar'
     if not jar.is_file():
         parser.error('Build the current Java project with Maven package first.')
     inputs = [ROOT / 'pom.xml', *ROOT.glob('src/main/**/*')]

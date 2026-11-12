@@ -17,7 +17,7 @@
 本地 Mac 终端在 Java 项目根目录执行；这些命令不是在云端 SSH 中执行：
 
 ```bash
-cd '/Users/xiao_xiong/Desktop/code/黑马点评/点评/hm-dianping'
+cd harbourdrop  # 项目根目录
 # 需要本机 JDK 21；项目自带 Maven Wrapper。跳过业务测试，但保留 Checkstyle 构建检查
 ./mvnw -Dmaven.test.skip=true package
 python3 deploy/package-release.py
@@ -27,7 +27,7 @@ python3 deploy/package-release.py
 
 ```bash
 docker run --rm -v "$PWD:/workspace" \
-  -v hm-dianping_maven-cache:/root/.m2 -w /workspace \
+  -v harbourdrop_maven-cache:/root/.m2 -w /workspace \
   maven:3.9-eclipse-temurin-21 mvn -Dmaven.test.skip=true package
 python3 deploy/package-release.py
 ```

@@ -1,4 +1,4 @@
-name: hm-dianping
+name: harbourdrop
 services:
   kafka-volume-init:
     image: apache/kafka:3.9.1
