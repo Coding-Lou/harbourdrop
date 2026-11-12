@@ -13,6 +13,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.util.UrlPathHelper;
 
 @Component
 public class AccessGuard implements HandlerInterceptor {
@@ -42,7 +43,13 @@ public class AccessGuard implements HandlerInterceptor {
   @Override
   public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object handler)
       throws Exception {
-    String path = req.getRequestURI();
+    // Spring MVC strips ";params" and decodes "%xx" before routing, so prefix checks on the raw
+    // URI could be bypassed (e.g. "/ops;x/..."). Reject ambiguous URIs, then match the same
+    // normalized lookup path that the handler mapping uses.
+    if (isAmbiguousUri(req.getRequestURI())) {
+      return reject(res, 400, "请求路径无效");
+    }
+    String path = UrlPathHelper.defaultInstance.getLookupPathForRequest(req);
     String method = req.getMethod();
     if (path.equals("/actuator/prometheus")
         && "GET".equals(method)
@@ -101,6 +108,18 @@ public class AccessGuard implements HandlerInterceptor {
       return reject(res, 429, "查询过于频繁");
     }
     return true;
+  }
+
+  static boolean isAmbiguousUri(String uri) {
+    return uri == null
+        || uri.indexOf(';') >= 0
+        || uri.indexOf('%') >= 0
+        || uri.indexOf('\\') >= 0
+        || uri.contains("//")
+        || uri.contains("/./")
+        || uri.contains("/../")
+        || uri.endsWith("/.")
+        || uri.endsWith("/..");
   }
 
   private boolean reject(HttpServletResponse res, int status, String text) throws Exception {

@@ -56,6 +56,36 @@ class AccessGuardTest {
   }
 
   @Test
+  void pathParameterAndEncodingTricksCannotBypassAdminChecks() throws Exception {
+    AccessGuard guard = new AccessGuard(mock(RateLimiter.class));
+    ReflectionTestUtils.setField(guard, "admins", "1010");
+    UserDTO user = new UserDTO();
+    user.setId(1012L);
+    UserHolder.saveUser(user);
+    String[][] attempts = {
+      {"PUT", "/shop;x"},
+      {"POST", "/shop;jsessionid=1"},
+      {"POST", "/ops;x/outbox/1/retry"},
+      {"POST", "/%6fps/seckill/1/publish"},
+      {"POST", "//ops/seckill/1/publish"},
+      {"POST", "/user/../ops/seckill/1/publish"},
+    };
+    for (String[] attempt : attempts) {
+      MockHttpServletResponse response = new MockHttpServletResponse();
+      assertFalse(
+          guard.preHandle(
+              new MockHttpServletRequest(attempt[0], attempt[1]), response, new Object()),
+          attempt[1]);
+      assertEquals(400, response.getStatus(), attempt[1]);
+    }
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    assertFalse(
+        guard.preHandle(
+            new MockHttpServletRequest("POST", "/ops/seckill/1/publish"), response, new Object()));
+    assertEquals(403, response.getStatus());
+  }
+
+  @Test
   void experienceAllowsBoundedPublicSamplingButKeepsOrderDetailsAndWritesPrivate()
       throws Exception {
     RateLimiter limits = mock(RateLimiter.class);
