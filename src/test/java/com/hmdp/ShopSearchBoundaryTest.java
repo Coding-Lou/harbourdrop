@@ -37,6 +37,6 @@ class ShopSearchBoundaryTest {
     criteria.setSort("distance");
     Result result = service.searchShops(criteria);
     assertFalse(result.getSuccess());
-    assertTrue(result.getErrorMsg().contains("x 和 y"));
+    assertTrue(result.getErrorMsg().contains("x and y"));
   }
 }

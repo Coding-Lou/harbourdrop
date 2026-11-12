@@ -92,7 +92,7 @@ class ExperienceIntegrationTest extends IntegrationTestBase {
       }
       Thread.sleep(1000);
     }
-    fail("本次三个浏览事件未在 30 秒内通过真实 Kafka 落库");
+    fail("The three view events were not stored through real Kafka within 30 seconds");
   }
 
   @Test

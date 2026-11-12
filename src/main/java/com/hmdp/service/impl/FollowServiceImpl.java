@@ -14,12 +14,6 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * 服务实现类
- *
- * @author 虎哥
- * @since 2021-12-22
- */
 @Service
 public class FollowServiceImpl implements IFollowService {
   @Resource
@@ -38,7 +32,7 @@ public class FollowServiceImpl implements IFollowService {
   public Result follow(Long target, Boolean enabled) {
     long user = UserHolder.getUser().getId();
     if (target == null || target == user || userService.getById(target) == null) {
-      return Result.fail("关注对象无效");
+      return Result.fail("Invalid user to follow.");
     }
     return transactions.execute(
         tx -> {

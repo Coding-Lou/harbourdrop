@@ -4,7 +4,7 @@ import com.hmdp.analytics.BehaviorEvent;
 import java.util.List;
 import java.util.Map;
 
-/** 业务处理服务。 */
+/** Aggregates behavior events into shop popularity rankings. */
 public interface IBehaviorAggregationService {
   void accept(BehaviorEvent event);
 

@@ -56,7 +56,7 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
         || event.getEventId() <= 0
         || event.getKind() == null
         || !group.equals(resolveConsumerGroup(event.getKind()))) {
-      throw new IllegalArgumentException("事件版本、事件号或消费组无效");
+      throw new IllegalArgumentException("Invalid event version, event ID or consumer group");
     }
     long started = System.nanoTime();
     try {
@@ -73,14 +73,15 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
   }
 
   private void consumeLockedTask(BusinessEvent event, String group) {
-    // 只锁当前事件；业务效果、Inbox 和任务完成状态仍在同一事务提交。
+    // Lock only the current event; business effects, the inbox and task completion still commit
+    // in one transaction.
     BusinessOutboxTask task = businessOutboxRepository.selectEventForUpdate(event.getEventId());
     if (task == null) {
-      throw new IllegalArgumentException("消息没有对应的持久化事件");
+      throw new IllegalArgumentException("Message has no matching persisted event");
     }
     if (!event.getKind().equals(task.getKind())
         || event.getAggregateId() != task.getAggregateId()) {
-      throw new IllegalArgumentException("消息内容与持久化事件不一致");
+      throw new IllegalArgumentException("Message content does not match the persisted event");
     }
     if (messageRepository.countInboxEvent(group, event.getEventId()) > 0) {
       businessOutboxRepository.markDuplicateDone(event.getEventId());
@@ -88,7 +89,7 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
       return;
     }
     if (OutboxState.REVIEW.matches(task.getState())) {
-      throw new IllegalStateException("事件等待人工复核");
+      throw new IllegalStateException("Event awaits manual review");
     }
     if (projector.project(task) == ProjectionResult.CONTINUE) {
       appendFeedContinuation(task);
@@ -99,17 +100,20 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
   }
 
   private void appendFeedContinuation(BusinessOutboxTask task) {
-    // 游标由当前批次推进；后续批次独立持久化，沿用原发布时间。
+    // The cursor advances with the current batch; later batches persist independently and keep the
+    // original publish time.
     long cursor = businessOutboxRepository.selectCursor(task.getId());
     businessOutboxRepository.insertFeedContinuation(
         task.getKind(), task.getAggregateId(), task.getUserId(), cursor, task.getCreatedAt());
   }
 
   /**
-   * 保存消费失败并决定 Broker 是否可以确认当前消息。
+   * Records a consumption failure and decides whether the broker may acknowledge the current
+   * message.
    *
-   * @return true 表示对应任务已经完成，或失败已持久隔离；false 表示仍需重新投递。 无效载荷按 Broker 消息身份隔离，不能借其 eventId 把其他真实任务标成
-   *     REVIEW。
+   * @return true if the task is already done or the failure has been durably quarantined; false if
+   *     it still needs redelivery. Invalid payloads are quarantined by broker message identity, so
+   *     their eventId cannot be used to mark another real task as REVIEW.
    */
   @Override
   public boolean recordConsumptionFailure(

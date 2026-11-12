@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <pattern id="check" width="80" height="80" patternUnits="userSpaceOnUse">
+      <rect width="80" height="80" fill="#FBF4EA"/>
+      <rect width="40" height="80" fill="#0B7A75" opacity=".16"/>
+      <rect width="80" height="40" fill="#0B7A75" opacity=".16"/>
+    </pattern>
+    <g id="pep">
+      <ellipse rx="20" ry="11" fill="#B8442E"/>
+      <ellipse cx="-4" cy="-2" rx="8" ry="4" fill="#CF5A40"/>
+    </g>
+    <g id="basil">
+      <path d="M0 0 C6 -14 22 -16 30 -10 C22 -2 10 4 0 0 Z" fill="#4E9A5B"/>
+      <path d="M3 -2 L24 -9" stroke="#3C7F48" stroke-width="1.5"/>
+    </g>
+  </defs>
+  <rect width="800" height="600" fill="#DCE9EE"/>
+  <circle cx="660" cy="100" r="140" fill="#C9DDE5"/>
+  <circle cx="120" cy="170" r="70" fill="#E8F3F1"/>
+  <!-- table cloth -->
+  <rect y="300" width="800" height="300" fill="url(#check)"/>
+  <rect y="300" width="800" height="8" fill="#0B7A75" opacity=".25"/>
+  <!-- board -->
+  <ellipse cx="360" cy="452" rx="262" ry="112" fill="#000" opacity=".1"/>
+  <rect x="40" y="410" width="90" height="26" rx="13" fill="#A3743F"/>
+  <ellipse cx="350" cy="432" rx="248" ry="108" fill="#B8854E"/>
+  <ellipse cx="350" cy="426" rx="248" ry="104" fill="#C9955A"/>
+  <!-- pizza -->
+  <ellipse cx="350" cy="422" rx="222" ry="94" fill="#E7A85C"/>
+  <ellipse cx="350" cy="418" rx="200" ry="82" fill="#D9653B"/>
+  <path d="M170 410 C180 360 260 340 330 345 C420 336 520 356 535 400 C548 446 480 480 400 486 C300 494 200 470 175 440 C160 428 165 418 170 410 Z" fill="#F7D27A"/>
+  <g fill="#FBE3A2" opacity=".8">
+    <ellipse cx="260" cy="380" rx="30" ry="10"/><ellipse cx="420" cy="452" rx="26" ry="9"/>
+  </g>
+  <use href="#pep" transform="translate(250 404)"/>
+  <use href="#pep" transform="translate(320 370)"/>
+  <use href="#pep" transform="translate(410 384)"/>
+  <use href="#pep" transform="translate(300 452)"/>
+  <use href="#pep" transform="translate(470 420)"/>
+  <use href="#pep" transform="translate(210 442)"/>
+  <use href="#basil" transform="translate(360 410)"/>
+  <use href="#basil" transform="translate(240 372) rotate(30)"/>
+  <use href="#basil" transform="translate(440 448) rotate(-20)"/>
+  <!-- missing slice -->
+  <path d="M350 420 L572 420 A222 94 0 0 1 520 481 Z" fill="#C9955A"/>
+  <path d="M350 420 L572 420" stroke="#B8854E" stroke-width="3"/>
+  <!-- lifted slice -->
+  <path d="M560 512 L700 434 Q742 466 736 520 Z" fill="#000" opacity=".12"/>
+  <path d="M548 496 L690 424 Q732 454 728 506 Z" fill="#F7D27A"/>
+  <path d="M690 424 Q732 454 728 506" fill="none" stroke="#E7A85C" stroke-width="18" stroke-linecap="round"/>
+  <use href="#pep" transform="translate(650 466) scale(.85)"/>
+  <use href="#pep" transform="translate(698 488) scale(.75)"/>
+  <use href="#basil" transform="translate(604 482) rotate(-12) scale(.8)"/>
+  <path d="M552 494 C540 480 548 470 556 466" fill="none" stroke="#F7D27A" stroke-width="4" stroke-linecap="round"/>
+  <!-- chili shaker -->
+  <rect x="664" y="300" width="56" height="84" rx="16" fill="#FFFFFF" opacity=".9"/>
+  <rect x="670" y="330" width="44" height="48" rx="10" fill="#D9653B"/>
+  <rect x="664" y="286" width="56" height="20" rx="6" fill="#5B8FA8"/>
+</svg>

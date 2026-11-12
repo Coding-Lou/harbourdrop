@@ -26,7 +26,7 @@
   gap: 16px;
 }
 .site-footer a:hover {
-  color: var(--orange-dark);
+  color: var(--primary-dark);
 }
 .empty-state {
   padding: 80px 32px;
@@ -80,7 +80,7 @@
   width: 24px;
   height: 24px;
   border: 2px solid #e6e1d4;
-  border-top-color: var(--orange);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   vertical-align: middle;
@@ -179,8 +179,8 @@
   width: 53px;
   height: 53px;
   border-radius: 15px;
-  background: var(--peach);
-  color: var(--orange);
+  background: var(--tint);
+  color: var(--primary);
   font-size: 28px;
   margin-bottom: 23px;
 }
@@ -192,9 +192,21 @@
   color: #898b7c;
   font-size: 13px;
 }
+.dialog-pickup {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--primary-dark);
+  font-size: 12px;
+  font-weight: 600;
+}
 .dialog-price {
   font-size: 31px;
-  color: var(--orange-dark);
+  color: var(--accent-dark);
   margin: 17px 0;
 }
 .dialog .dialog-rules {

@@ -106,8 +106,9 @@ public class SecurityConfig {
                 ? null
                 : jwtResolver.resolve(request);
     AuthenticationEntryPoint unauthenticated =
-        (request, response, e) -> write(response, 401, "请先登录");
-    AccessDeniedHandler denied = (request, response, e) -> write(response, 403, "当前账号没有管理权限");
+        (request, response, e) -> write(response, 401, "Please sign in.");
+    AccessDeniedHandler denied =
+        (request, response, e) -> write(response, 403, "You don't have permission to manage this.");
 
     http.csrf(AbstractHttpConfigurer::disable)
         .formLogin(AbstractHttpConfigurer::disable)

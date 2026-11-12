@@ -2,7 +2,7 @@ package com.hmdp.service;
 
 import com.hmdp.messaging.BusinessEvent;
 
-/** 业务处理服务。 */
+/** Consumes business events and records consumption failures. */
 public interface IBusinessEventService {
   void consume(BusinessEvent event, String group);
 

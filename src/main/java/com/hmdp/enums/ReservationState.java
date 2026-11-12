@@ -1,6 +1,6 @@
 package com.hmdp.enums;
 
-/** 持久预约与 Redis 请求投影使用的稳定状态值。 */
+/** Stable state values shared by durable reservations and the Redis request projection. */
 public enum ReservationState {
   PROCESSING,
   SUCCESS,

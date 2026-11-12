@@ -3,8 +3,11 @@ package com.hmdp.service;
 import com.hmdp.entity.BusinessOutboxTask;
 import com.hmdp.messaging.ProjectionResult;
 
-/** 将持久业务事实投影到缓存、资源或后续任务。调用方负责消息身份与消费事务。 */
+/**
+ * Projects durable business facts onto caches, resources, or follow-up tasks. Callers own message
+ * identity and the consuming transaction.
+ */
 public interface IBusinessProjectionService {
-  /** CONTINUE 表示本批成功但尚有后续批次；失败通过异常保留重试责任。 */
+  /** CONTINUE means this batch succeeded with more to come; failures throw to keep retrying. */
   ProjectionResult project(BusinessOutboxTask task);
 }

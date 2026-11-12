@@ -141,9 +141,11 @@ public class KafkaBehaviorTransport {
   }
 
   /**
-   * 发送持久行为事件并等待 Kafka 确认，失败或超时交给 Outbox 重试。
+   * Sends a durable behavior event and waits for the Kafka ack; failures and timeouts are left
+   * to the outbox to retry.
    *
-   * <p>确认可能丢失，因此不能把一次异常理解为事件必定没发送；重试必须保留原 eventId。
+   * <p>The ack can be lost, so an exception doesn't prove the event was never sent; retries must
+   * keep the original eventId.
    */
   public void publishAndAwaitAcknowledgement(BehaviorEvent event) {
     try {
@@ -152,7 +154,7 @@ public class KafkaBehaviorTransport {
       if (failure instanceof InterruptedException) {
         Thread.currentThread().interrupt();
       }
-      throw new IllegalStateException("Kafka 行为事件投递未确认", failure);
+      throw new IllegalStateException("Kafka behavior event delivery not acknowledged", failure);
     }
   }
 
@@ -229,7 +231,9 @@ public class KafkaBehaviorTransport {
                   client.seek(partition, offset);
                 }
               });
-          log.warn("Kafka 统计批次失败，将按原事件号重放: {}", FailureMessages.summarize(unavailable));
+          log.warn(
+              "Kafka stats batch failed; replaying with the original event IDs: {}",
+              FailureMessages.summarize(unavailable));
           try {
             Thread.sleep(500);
           } catch (InterruptedException stopped) {
@@ -240,10 +244,10 @@ public class KafkaBehaviorTransport {
       }
     } catch (WakeupException stopping) {
       if (running) {
-        log.warn("Kafka 消费被意外唤醒", stopping);
+        log.warn("Kafka consumer was woken up unexpectedly", stopping);
       }
     } catch (RuntimeException failure) {
-      log.error("Kafka 行为消费者退出", failure);
+      log.error("Kafka behavior consumer exited", failure);
     } finally {
       consuming.set(0);
       consumer = null;

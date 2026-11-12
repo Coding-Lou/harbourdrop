@@ -14,7 +14,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * @author 虎哥
+ * A user account.
+ *
  * @since 2021-12-22
  */
 @Data
@@ -28,29 +29,29 @@ public class User implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 主键 */
+  /** Primary key */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** 手机号码 */
+  /** Phone number */
   private String phone;
 
   /** Login identity, stored lowercase. */
   private String email;
 
-  /** 密码，加密存储 */
+  /** Password, stored encrypted */
   private String password;
 
-  /** 昵称，默认是随机字符 */
+  /** Nickname; defaults to random characters */
   private String nickName;
 
-  /** 用户头像 */
+  /** Avatar */
   private String icon = "";
 
-  /** 创建时间 */
+  /** Created at */
   private LocalDateTime createTime;
 
-  /** 更新时间 */
+  /** Updated at */
   private LocalDateTime updateTime;
 }

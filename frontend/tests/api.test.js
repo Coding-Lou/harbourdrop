@@ -7,16 +7,22 @@ import {
   safeReturn,
   imagePath,
   money,
+  parseServerTime,
+  formatTime,
+  formatDate,
+  formatDateTime,
+  formatMoment,
+  formatWindow,
 } from "../scripts/api.js";
 
 test("Java Long IDs retain every digit while normal numbers and string contents stay unchanged", () => {
   const result = parseResponseText(
-    '{"success":true,"data":{"order_id":339587467398192145,"stock":9,"text":"订单 339587467398192145，\\"价格\\"","price":0.12345678901234567,"scientific":1.2e3,"negative":-9223372036854775808}}',
+    '{"success":true,"data":{"order_id":339587467398192145,"stock":9,"text":"Order 339587467398192145, \\"price\\"","price":0.12345678901234567,"scientific":1.2e3,"negative":-9223372036854775808}}',
   );
   assert.equal(result.data.order_id, "339587467398192145");
   assert.equal(result.data.negative, "-9223372036854775808");
   assert.equal(result.data.stock, 9);
-  assert.equal(result.data.text, '订单 339587467398192145，"价格"');
+  assert.equal(result.data.text, 'Order 339587467398192145, "price"');
   assert.equal(result.data.price, 0.12345678901234567);
   assert.equal(result.data.scientific, 1200);
 });
@@ -56,7 +62,7 @@ test("voucher cents render correctly including free vouchers and missing amounts
   assert.equal(money(null), "—");
 });
 
-test("requests encode Chinese searches and retain zero/false values and fresh authorization", async () => {
+test("requests encode searches with special characters and retain zero/false values and fresh authorization", async () => {
   let token = "first-token";
   const requests = [];
   const request = createApi({
@@ -68,12 +74,12 @@ test("requests encode Chinese searches and retain zero/false values and fresh au
     },
   });
   await request("/shop/catalog", {
-    params: { keyword: "茶餐厅 & 咖啡", page: 0, liked: false },
+    params: { keyword: "Dim sum & coffee", page: 0, liked: false },
   });
   token = "second-token";
   await request("/user/me");
   const url = new URL(requests[0].url, "http://127.0.0.1");
-  assert.equal(url.searchParams.get("keyword"), "茶餐厅 & 咖啡");
+  assert.equal(url.searchParams.get("keyword"), "Dim sum & coffee");
   assert.equal(url.searchParams.get("page"), "0");
   assert.equal(url.searchParams.get("liked"), "false");
   assert.equal(requests[0].options.headers.Authorization, "Bearer first-token");
@@ -131,13 +137,13 @@ test("business rejection retains its actual message and differs from an uncertai
     tokenProvider: () => null,
     onUnauthorized() {},
     fetchImpl: async () =>
-      new Response('{"success":false,"errorMsg":"库存不足"}'),
+      new Response('{"success":false,"errorMsg":"Out of stock."}'),
   });
   await assert.rejects(
     request("/voucher-order/ordinary/1", { method: "POST" }),
     (error) => {
       assert.ok(error instanceof ApiError);
-      assert.equal(error.message, "库存不足");
+      assert.equal(error.message, "Out of stock.");
       assert.equal(error.status, 200);
       return true;
     },
@@ -172,11 +178,77 @@ test("timeout and throttling show actionable messages rather than reporting succ
         );
       }),
   });
-  await assert.rejects(timeoutRequest("/shop/catalog"), /请求超时/);
+  await assert.rejects(timeoutRequest("/shop/catalog"), /timed out/);
   const limitedRequest = createApi({
     tokenProvider: () => null,
     onUnauthorized() {},
     fetchImpl: async () => new Response("", { status: 429 }),
   });
-  await assert.rejects(limitedRequest("/user/code"), /操作太频繁/);
+  await assert.rejects(limitedRequest("/user/code"), /Too many requests/);
+});
+
+test("server LocalDateTime strings without an offset are read as UTC", () => {
+  const expected = Date.UTC(2026, 10, 12, 20, 30, 0);
+  assert.equal(parseServerTime("2026-11-12T20:30:00"), expected);
+  assert.equal(parseServerTime("2026-11-12 20:30:00"), expected);
+  assert.equal(parseServerTime("2026-11-12T20:30"), expected);
+  assert.equal(parseServerTime("2026-11-12T20:30:00.123456"), expected + 123);
+  assert.equal(parseServerTime("2026-11-12T20:30:00.5"), expected + 500);
+  // Explicit offsets are honoured rather than overridden.
+  assert.equal(parseServerTime("2026-11-12T20:30:00Z"), expected);
+  assert.equal(parseServerTime("2026-11-12T12:30:00-08:00"), expected);
+  assert.equal(parseServerTime("2026-11-12T20:30:00.000+0000"), expected);
+  assert.equal(parseServerTime([2026, 11, 12, 20, 30]), expected);
+  assert.equal(parseServerTime(expected), expected);
+  assert.ok(Number.isNaN(parseServerTime(null)));
+  assert.ok(Number.isNaN(parseServerTime("")));
+  assert.ok(Number.isNaN(parseServerTime("not a time")));
+});
+
+test("times render in Vancouver, including across daylight saving time", () => {
+  // January 2026 is PST (UTC-8) in every tzdata version (newer releases keep BC on PDT
+  // year-round from late 2026), so winter expectations use January: 04:30 UTC on Jan 13 is
+  // 8:30 PM on Jan 12.
+  assert.equal(formatTime("2026-01-13T04:30:00"), "8:30 PM");
+  assert.equal(formatDate("2026-01-13T04:30:00"), "Jan 12, 2026");
+  // July is PDT (UTC-7): 03:30 UTC on Jul 1 is 8:30 PM on Jun 30.
+  assert.equal(formatTime("2026-07-01T03:30:00"), "8:30 PM");
+  assert.equal(formatDate("2026-07-01T03:30:00"), "Jun 30, 2026");
+  // Spring-forward day: 09:59 UTC is 1:59 AM PST, 10:00 UTC is 3:00 AM PDT.
+  assert.equal(formatTime("2026-03-08T09:59:00"), "1:59 AM");
+  assert.equal(formatTime("2026-03-08T10:00:00"), "3:00 AM");
+  assert.equal(
+    formatDateTime("2026-10-10T15:13:58.466556+00:00", { seconds: true }),
+    "Oct 10, 2026, 8:13:58 AM",
+  );
+  assert.equal(formatTime(null), "—");
+  assert.equal(formatDate("garbage"), "—");
+});
+
+test("pickup windows collapse shared day periods and show dates when needed", () => {
+  const now = parseServerTime("2026-01-12T20:00:00"); // Jan 12, 12:00 PM in Vancouver
+  assert.equal(
+    formatWindow("2026-01-13T04:30:00", "2026-01-13T05:00:00", now),
+    "8:30–9:00 PM",
+  );
+  assert.equal(
+    formatWindow("2026-01-12T19:30:00", "2026-01-12T21:00:00", now),
+    "11:30 AM–1:00 PM",
+  );
+  assert.equal(
+    formatWindow("2026-01-13T04:30:00", "2026-01-13T17:00:00", now),
+    "Jan 12, 8:30 PM–Jan 13, 9:00 AM",
+  );
+  assert.equal(
+    formatWindow("2026-01-14T04:30:00", "2026-01-14T05:00:00", now),
+    "Tomorrow, 8:30–9:00 PM",
+  );
+  assert.equal(
+    formatWindow("2026-01-16T04:30:00", "2026-01-16T05:00:00", now),
+    "Jan 15, 8:30–9:00 PM",
+  );
+  assert.equal(formatWindow(null, "2026-01-13T05:00:00", now), "");
+  assert.equal(formatWindow(undefined, undefined, now), "");
+  assert.equal(formatMoment("2026-01-13T02:00:00", now), "6:00 PM");
+  assert.equal(formatMoment("2026-01-14T02:00:00", now), "Tomorrow, 6:00 PM");
 });

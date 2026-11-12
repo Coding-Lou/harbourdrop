@@ -18,7 +18,7 @@ public class MediaStorage {
       path = path.substring(5);
     }
     if (path == null || !path.matches("/blogs/[0-9]+/[0-9]+/[a-f0-9-]+\\.(jpg|jpeg|png|webp)")) {
-      throw new IllegalArgumentException("错误的文件名称");
+      throw new IllegalArgumentException("Invalid file name.");
     }
     return path;
   }
@@ -28,12 +28,12 @@ public class MediaStorage {
     Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
     Path file = root.resolve(path.substring(1)).normalize();
     if (!file.startsWith(root) || Files.isDirectory(file)) {
-      throw new IllegalStateException("错误的文件路径");
+      throw new IllegalStateException("Invalid file path");
     }
     try {
       Files.deleteIfExists(file);
     } catch (IOException e) {
-      throw new IllegalStateException("图片删除失败，将重试", e);
+      throw new IllegalStateException("Image deletion failed; will retry", e);
     }
   }
 }

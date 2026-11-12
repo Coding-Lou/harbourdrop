@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-10-10T15:13:58.466556+00:00",
-  "scope": "隔离数据库 hmdp_optimization_test，完整回归命令一次通过；不等同于访客点击页面运行全部测试",
+  "scope": "Isolated database hmdp_optimization_test; the full regression command passed in a single run. This is not the same as a visitor running every test from the page.",
   "tests": 90,
   "failures": 0,
   "errors": 0,
@@ -176,112 +176,112 @@
   ],
   "features": [
     {
-      "feature": "请求内缓存、LoadingCache、Memcache、版本命名空间和回填",
+      "feature": "Request-scope cache, LoadingCache, Memcache, versioned namespaces and backfill",
       "tests": [
         "RequestCacheScopeTest",
         "CacheLayersIntegrationTest",
         "CacheChangeProjectorTest"
       ],
-      "boundary": "同一 JVM 内独立 CacheClient 与并发线程；未部署多个 Java 节点做故障演练"
+      "boundary": "Independent CacheClient instances and concurrent threads within one JVM; no multi-node Java deployment for failure drills"
     },
     {
-      "feature": "空值缓存、互斥重建、旧回填隔离、TTL、Memcache 故障回退",
+      "feature": "Null-value caching, mutex rebuild, stale-backfill isolation, TTL, Memcache failure fallback",
       "tests": [
         "CacheLayersIntegrationTest",
         "CacheConcurrencyTest",
         "ShopCacheCompatibilityTest",
         "ReliabilityIntegrationTest"
       ],
-      "boundary": "未实测 Redis Cluster、主从切换或持续缓存雪崩负载"
+      "boundary": "Not tested against Redis Cluster, primary/replica failover or sustained cache-avalanche load"
     },
     {
-      "feature": "Canal 外部 SQL 变更、删除、券换店、重连、成功后 ACK",
+      "feature": "Canal: external SQL changes, deletes, voucher moved to another shop, reconnect, ACK after success",
       "tests": [
         "CacheCdcIntegrationTest",
         "CanalBatchTest",
         "CacheChangeProjectorTest"
       ],
-      "boundary": "真实单实例 Canal/MySQL；未测长时间 binlog 过期或集群切换"
+      "boundary": "Real single-instance Canal/MySQL; long binlog expiry and cluster failover not tested"
     },
     {
-      "feature": "Lua 抢购、最后库存并发竞争、重复下单、事务与资格唯一约束",
+      "feature": "Lua flash-sale purchase, concurrent race for the last unit, duplicate orders, transactions and the purchase-slot unique constraint",
       "tests": ["ReliabilityIntegrationTest", "VoucherOrderReliabilityTest"],
-      "boundary": "测试直接调用 Service；不是 HTTP 秒杀容量压测"
+      "boundary": "Tests call the service layer directly; not an HTTP flash-sale capacity load test"
     },
     {
-      "feature": "Stream pending 接管、毒消息隔离、状态、补偿、恢复和对账",
+      "feature": "Stream pending-entry takeover, poison-message isolation, state, compensation, recovery and reconciliation",
       "tests": ["ReliabilityIntegrationTest", "SeckillMessageTest"],
-      "boundary": "相关管理 HTTP 成功路径尚未系统覆盖；当前应用无管理员白名单"
+      "boundary": "The related admin HTTP success paths are not yet systematically covered; the app currently has no admin allowlist"
     },
     {
-      "feature": "Outbox、Inbox 幂等、发送确认丢失、消费先完成、租约恢复",
+      "feature": "Outbox, idempotent inbox, lost send acknowledgements, consume-before-ack, lease recovery",
       "tests": ["MessagingIntegrationTest", "RocketMqIntegrationTest"],
-      "boundary": "可控故障与真实单 Broker；未测宿主机断电或多副本切换"
+      "boundary": "Controlled faults and a real single broker; host power loss and multi-replica failover not tested"
     },
     {
-      "feature": "RocketMQ 秒杀履约、重复投递、延迟关单与支付竞态",
+      "feature": "RocketMQ flash-sale fulfilment, redelivery, delayed order closing and payment races",
       "tests": ["RocketMqIntegrationTest", "MessagingIntegrationTest"],
-      "boundary": "3 项真实 Broker 测试；支付为本地模拟，当前业务环境关闭模拟支付"
+      "boundary": "3 tests against a real broker; payment is simulated locally, and mock payment is disabled in the business environment"
     },
     {
-      "feature": "Kafka 浏览采集、交易 Outbox、PV/UV 窗口与去重",
+      "feature": "Kafka page-view tracking, transactional outbox, PV/UV windows and de-duplication",
       "tests": [
         "KafkaBehaviorIntegrationTest",
         "BehaviorAggregationIntegrationTest"
       ],
-      "boundary": "2 项真实 Broker 测试；浏览采集允许丢失，不宣称跨存储 Exactly Once"
+      "boundary": "2 tests against a real broker; page-view tracking tolerates loss, and no cross-store exactly-once is claimed"
     },
     {
-      "feature": "普通券防重、取消重下、订单快照、超时关闭",
+      "feature": "Duplicate protection for deals, cancel-and-reorder, order snapshots, timeout closing",
       "tests": [
         "ReliabilityIntegrationTest",
         "MessagingIntegrationTest",
         "MockPaymentTest",
         "VoucherOrderReliabilityTest"
       ],
-      "boundary": "HTTP 登录下单查单完整闭环尚未系统覆盖；无真实支付、退款、核销"
+      "boundary": "The full HTTP sign-in → order → lookup loop is not yet systematically covered; no real payment, refund or redemption"
     },
     {
-      "feature": "点赞关注幂等、Feed 分发、图片归属、删除发布竞态与重试",
+      "feature": "Idempotent likes and follows, feed fan-out, image ownership, delete-vs-publish races and retries",
       "tests": ["ReliabilityIntegrationTest", "UserLogoutTest"],
-      "boundary": "部分测 Controller/Service，未覆盖所有 HTTP 绑定、分页和错误输入"
+      "boundary": "Partly tested at controller/service level; not every HTTP binding, pagination case or invalid input is covered"
     },
     {
-      "feature": "登录验证码限流与一次性消费、鉴权、监控凭证、管理员隔离",
+      "feature": "Sign-in code rate limiting and single use, authorization, monitoring credentials, admin isolation",
       "tests": [
         "LoginCodeTest",
         "AccessGuardTest",
         "CacheLayersIntegrationTest",
         "ReliabilityIntegrationTest"
       ],
-      "boundary": "真实短信不在范围；签到与连续签到缺少专门自动断言"
+      "boundary": "Real SMS delivery is out of scope; check-ins and check-in streaks lack dedicated automated assertions"
     },
     {
-      "feature": "搜索数据库分页、边界与 Mapper 分层",
+      "feature": "Search: database pagination, boundaries and mapper layering",
       "tests": [
         "ShopSearchBoundaryTest",
         "ReliabilityIntegrationTest",
         "MapperArchitectureTest"
       ],
-      "boundary": "catalog/batch/areas 当前公开读取成功；新增创建与修改 HTTP 场景仍需补齐"
+      "boundary": "catalog/batch/areas public reads currently succeed; HTTP scenarios for create and update still need coverage"
     },
     {
-      "feature": "缓存 HTTP 基线对照",
+      "feature": "Cache HTTP baseline comparison",
       "tests": ["CacheBenchmarkIntegrationTest"],
-      "boundary": "单实例热 key、8 并发、每阶段 10000 次；不能用来宣称秒杀或生产容量"
+      "boundary": "Single instance, hot key, concurrency 8, 10,000 requests per phase; cannot be used to claim flash-sale or production capacity"
     },
     {
-      "feature": "Prometheus 指标与 18 条告警规则",
+      "feature": "Prometheus metrics and 18 alerting rules",
       "tests": ["CacheLayersIntegrationTest", "AccessGuardTest"],
-      "boundary": "targets up、规则 health=ok；未触发全部告警或验证外部通知"
+      "boundary": "Targets up and rules health=ok; not every alert was triggered and external notifications were not verified"
     }
   ],
   "limitations": [
-    "BlogCommentsController 为空，无评论处理接口",
-    "真实支付与退款",
-    "真实短信发送",
-    "Token 包、额度账本和权益账户迁移",
-    "Redis Cluster 同槽改造及高可用演练"
+    "BlogCommentsController is empty; there is no comment endpoint",
+    "Real payments and refunds",
+    "Real SMS delivery",
+    "Token bundles, quota ledger and entitlement-account migration",
+    "Redis Cluster same-slot refactoring and high-availability drills"
   ],
   "checkstyleSkipped": false,
   "skipped": 0,

@@ -6,9 +6,8 @@ import com.hmdp.entity.Shop;
 import java.util.List;
 
 /**
- * 服务类
+ * Shop service.
  *
- * @author 虎哥
  * @since 2021-12-22
  */
 public interface IShopService {

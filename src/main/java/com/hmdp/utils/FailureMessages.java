@@ -1,6 +1,9 @@
 package com.hmdp.utils;
 
-/** 持久化失败原因的摘要，避免基础设施依赖某个业务 Service 实现类。 */
+/**
+ * Summarizes persisted failure reasons so infrastructure doesn't depend on a business service
+ * implementation class.
+ */
 public final class FailureMessages {
   private static final int MAX_REASON_LENGTH = 500;
 

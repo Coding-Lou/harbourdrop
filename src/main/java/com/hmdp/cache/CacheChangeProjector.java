@@ -50,9 +50,12 @@ public class CacheChangeProjector {
   }
 
   /**
-   * 仅处理指定数据库和表的变更，失效相关元数据缓存并按需回源。
+   * Handles changes only for the configured database and tables, invalidating the related
+   * metadata caches and reloading them as needed.
    *
-   * <p>活动执行库存和购买资格由秒杀流程维护，CDC 不用数据库快照覆盖 Redis 执行状态。回源读取的是数据库当前值， 因此重放旧事件不会把旧内容写回缓存。
+   * <p>Campaign stock and purchase eligibility are maintained by the flash-sale flow, so CDC never
+   * overwrites Redis execution state with a database snapshot. Reloads read the current database
+   * value, so replaying old events cannot write stale content back into the cache.
    */
   public void projectRowChange(CdcRowChange change) {
     log.debug("CDC row {}.{} op={}", change.schema(), change.table(), change.operation());
@@ -66,7 +69,8 @@ public class CacheChangeProjector {
       projectVoucherChange(
           parseRowId(identity, "id"), change.operation(), change.before(), change.after());
     }
-    // 活动库存与窗口实时查库；CDC 不覆盖 Redis 的执行库存或购买资格。
+    // Campaign stock and windows are read live from the database; CDC doesn't overwrite Redis
+    // execution stock or purchase eligibility.
     metrics.counter("hmdp.cdc.rows", "table", change.table()).increment();
   }
 
@@ -108,7 +112,8 @@ public class CacheChangeProjector {
       Map<String, String> before,
       Map<String, String> after) {
     cache.invalidate("cache:voucher-meta:" + voucherId);
-    // 券换店后旧、新店铺都需要失效；这里只对当前行的关联店铺去重。
+    // When a voucher moves shops, both the old and new shop must be invalidated; this only
+    // de-duplicates the current row's linked shop.
     Set<String> shopIds = new HashSet<>();
     shopIds.add(before.get("shop_id"));
     shopIds.add(after.get("shop_id"));
@@ -130,7 +135,7 @@ public class CacheChangeProjector {
   private static long parseRowId(Map<String, String> row, String key) {
     String value = row.get(key);
     if (value == null) {
-      throw new IllegalStateException("binlog 缺少完整主键: " + key);
+      throw new IllegalStateException("binlog is missing the full primary key: " + key);
     }
     return Long.parseLong(value);
   }

@@ -10,7 +10,7 @@ public class BehaviorEvent {
   private Long userId;
   private String action;
 
-  /** 事件发生时间，Unix 毫秒；保留 occurredAt 作为 JSON 协议字段。 */
+  /** When the event occurred, in Unix millis; occurredAt is kept as the JSON protocol field. */
   private long occurredAt;
 
   public BehaviorEvent() {}
@@ -34,7 +34,7 @@ public class BehaviorEvent {
         || occurredAt <= 0
         || occurredAt > System.currentTimeMillis() + 60000
         || !("VISIT".equals(action) || "ORDER".equals(action) || "PAID".equals(action))) {
-      throw new IllegalArgumentException("行为事件格式无效");
+      throw new IllegalArgumentException("Malformed behavior event");
     }
   }
 }

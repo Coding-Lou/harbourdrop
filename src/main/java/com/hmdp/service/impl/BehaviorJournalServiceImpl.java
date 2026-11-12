@@ -58,9 +58,11 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
   }
 
   /**
-   * 从持久订单快照生成分析事件，在当前业务事务内写入分析 Outbox。
+   * Builds an analytics event from the persisted order snapshot and writes it to the analytics
+   * outbox within the current business transaction.
    *
-   * <p>事件号沿用来源任务 ID，重放不会生成新的业务身份；当前券的价格或归属不替代历史快照。
+   * <p>The event ID reuses the source task ID, so a replay never creates a new business identity;
+   * the voucher's current price or ownership never replaces the historical snapshot.
    */
   @Override
   public void appendOrderBehaviorEvent(BusinessOutboxTask source) {
@@ -68,7 +70,7 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
       return;
     }
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("订单分析事件需要业务事务");
+      throw new IllegalStateException("Order analytics event requires a business transaction");
     }
     List<Map<String, Object>> rows =
         voucherOrderRepository.selectBehaviorSnapshot(source.getAggregateId());
@@ -87,7 +89,7 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
       behaviorRepository.insertOutboxEvent(
           event.getEventId(), event.getShopId(), json.writeValueAsString(event));
     } catch (JsonProcessingException bad) {
-      throw new IllegalArgumentException("订单分析事件编码失败", bad);
+      throw new IllegalArgumentException("Failed to encode order analytics event", bad);
     }
   }
 
@@ -97,11 +99,13 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
   }
 
   /**
-   * 提交一条访问统计事件并返回事件号，用于后续查询落库结果。
+   * Submits a visit analytics event and returns its event ID for looking up the persisted result
+   * later.
    *
-   * <p>访问事件走尽力投递；返回事件号只表示发起采集，不保证 Kafka 已确认或数据库已落库。
+   * <p>Visit events are delivered best-effort; a returned event ID only means collection started,
+   * not that Kafka acknowledged it or that the database stored it.
    *
-   * <p>分析功能未开启时返回 null。
+   * <p>Returns null when analytics is disabled.
    */
   @Override
   public String submitShopVisitEvent(long shopId, Long userId) {
@@ -118,9 +122,11 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
 
   @Scheduled(fixedDelay = 1000)
   /**
-   * 领取并发送一批持久分析事件，网络发送在认领事务提交后进行。
+   * Claims and sends a batch of persisted analytics events; network sends happen after the claim
+   * transaction commits.
    *
-   * <p>只有 Kafka 确认后才写 SENT；确认丢失时沿用原事件号重试，由消费端幂等去重。
+   * <p>SENT is written only after Kafka acknowledges; if the ack is lost, the retry reuses the
+   * original event ID and the consumer deduplicates idempotently.
    */
   @Override
   public void relayAnalyticsOutboxBatch() {

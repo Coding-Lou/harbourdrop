@@ -165,6 +165,7 @@ services:
       HMDP_MQ_SECKILL_ENABLED: 'true'
       HMDP_ANALYTICS_ENABLED: 'true'
       HMDP_EXPERIENCE_ENABLED: ${HMDP_EXPERIENCE_ENABLED:-true}
+      HMDP_DEMO_DROPS_ENABLED: ${HMDP_DEMO_DROPS_ENABLED:-true}
       HMDP_KAFKA_SERVERS: kafka:9092
       HMDP_MONITOR_TOKEN: ${HMDP_MONITOR_TOKEN:-hmdp_dev_metrics}
       HMDP_JWT_SECRET: ${HMDP_JWT_SECRET:-local-development-only-jwt-secret-change-me}

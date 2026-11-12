@@ -12,9 +12,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * 秒杀优惠券表，与优惠券是一对一关系
+ * Flash-sale details for a voucher; one-to-one with the voucher table.
  *
- * @author 虎哥
  * @since 2022-01-04
  */
 @Data
@@ -28,21 +27,27 @@ public class SeckillVoucher implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 关联的优惠券的id */
+  /** ID of the associated voucher */
   @Id private Long voucherId;
 
-  /** 库存 */
+  /** Stock */
   private Integer stock;
 
-  /** 创建时间 */
+  /** Created at */
   private LocalDateTime createTime;
 
-  /** 生效时间 */
+  /** Sale opens at */
   private LocalDateTime beginTime;
 
-  /** 失效时间 */
+  /** Sale closes at */
   private LocalDateTime endTime;
 
-  /** 更新时间 */
+  /** Pickup window opens at (optional) */
+  private LocalDateTime pickupBeginTime;
+
+  /** Pickup window closes at (optional) */
+  private LocalDateTime pickupEndTime;
+
+  /** Updated at */
   private LocalDateTime updateTime;
 }

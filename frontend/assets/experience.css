@@ -1,5 +1,5 @@
 .experience-nav {
-  color: var(--orange-dark);
+  color: var(--primary-dark);
   font-size: 12px;
   white-space: nowrap;
 }
@@ -153,8 +153,8 @@
   flex: 0 0 auto;
 }
 .experience-step {
-  background: #fff1e9;
-  color: var(--orange-dark);
+  background: var(--tint);
+  color: var(--primary-dark);
   border-radius: 14px;
   padding: 12px 16px;
   font-size: 22px;
@@ -252,8 +252,8 @@
   background: #edf3e8;
 }
 .experience-cell.source {
-  color: #bd633d;
-  background: #fff0e6;
+  color: #9a5214;
+  background: var(--accent-tint);
 }
 .experience-cell.idle {
   color: #9e9e94;

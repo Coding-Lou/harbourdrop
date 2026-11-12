@@ -32,7 +32,7 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
   jackson:
-    default-property-inclusion: non_null # JSON处理时忽略非空字段
+    default-property-inclusion: non_null # omit null fields when serializing JSON
   kafka:
     bootstrap-servers: ${HMDP_KAFKA_SERVERS:127.0.0.1:9092}
     producer:
@@ -82,6 +82,11 @@ citylens:
 hmdp:
   experience:
     enabled: ${HMDP_EXPERIENCE_ENABLED:false}
+  demo:
+    # Publishes surplus-bag drops for a few seeded shops so a fresh demo always has one to claim.
+    drops-enabled: ${HMDP_DEMO_DROPS_ENABLED:false}
+    drop-shop-ids: ${HMDP_DEMO_DROP_SHOP_IDS:1,3,7,13,15}
+    drop-stock: ${HMDP_DEMO_DROP_STOCK:8}
   analytics:
     enabled: ${HMDP_ANALYTICS_ENABLED:false}
     bootstrap-servers: ${HMDP_KAFKA_SERVERS:127.0.0.1:9092}
@@ -109,7 +114,7 @@ hmdp:
   mail:
     # Login codes are emailed when enabled (SMTP from SPRING_MAIL_HOST/PORT, e.g. Mailpit).
     enabled: ${HMDP_MAIL_ENABLED:false}
-    from: ${HMDP_MAIL_FROM:no-reply@hmdp.local}
+    from: ${HMDP_MAIL_FROM:no-reply@harbourdrop.local}
     # Demo hosts without SMTP only: write codes to the log instead of failing. Never in production.
     log-codes: ${HMDP_LOGIN_CODE_LOG:false}
   cache:

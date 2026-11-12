@@ -11,9 +11,8 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 秒杀优惠券表，与优惠券是一对一关系 数据访问接口
+ * Data access for flash-sale vouchers (one-to-one with vouchers).
  *
- * @author 虎哥
  * @since 2022-01-04
  */
 public interface SeckillVoucherRepository

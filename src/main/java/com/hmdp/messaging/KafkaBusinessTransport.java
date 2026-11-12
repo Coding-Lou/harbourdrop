@@ -135,7 +135,7 @@ public class KafkaBusinessTransport implements EventPublisher {
       RuntimeException error =
           failure instanceof RuntimeException
               ? (RuntimeException) failure
-              : new IllegalArgumentException("消息格式错误", failure);
+              : new IllegalArgumentException("Malformed message", failure);
       metrics.counter("hmdp.mq.consumptions", "group", group, "result", "retry").increment();
       boolean settled;
       try {
@@ -143,7 +143,9 @@ public class KafkaBusinessTransport implements EventPublisher {
             handler.recordConsumptionFailure(
                 event, group, brokerId(record), record.value(), error, deliveryAttempt(record));
       } catch (RuntimeException storageFailure) {
-        log.warn("消息 {} 的失败状态尚未持久化，保持重试", brokerId(record));
+        log.warn(
+            "Failure state for message {} not persisted yet; keeping it for retry",
+            brokerId(record));
         throw error;
       }
       if (!settled) {
@@ -167,7 +169,7 @@ public class KafkaBusinessTransport implements EventPublisher {
   @Override
   public void publish(BusinessEvent event) {
     if (connected.get() == 0) {
-      throw new IllegalStateException("Kafka 业务消息客户端尚未启动");
+      throw new IllegalStateException("Kafka business message client has not started");
     }
     String group = BusinessEventServiceImpl.resolveConsumerGroup(event.getKind());
     try {
@@ -184,9 +186,9 @@ public class KafkaBusinessTransport implements EventPublisher {
       template.send(record).get(sendTimeoutMillis, TimeUnit.MILLISECONDS);
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("Kafka 投递被中断", interrupted);
+      throw new IllegalStateException("Kafka delivery was interrupted", interrupted);
     } catch (Exception failure) {
-      throw new IllegalStateException("Kafka 投递结果未确认", failure);
+      throw new IllegalStateException("Kafka delivery not acknowledged", failure);
     }
   }
 

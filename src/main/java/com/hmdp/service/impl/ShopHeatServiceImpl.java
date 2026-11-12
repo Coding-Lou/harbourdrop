@@ -53,10 +53,10 @@ public class ShopHeatServiceImpl implements IShopHeatService {
   @Override
   public Result ranking(int windowMinutes, int limit) {
     if (!enabled) {
-      return Result.fail("商家热度统计未启用");
+      return Result.fail("Shop popularity stats are disabled.");
     }
     if ((windowMinutes != 5 && windowMinutes != 60) || limit < 1 || limit > 100) {
-      return Result.fail("窗口仅支持 5 或 60 分钟，条数 1～100");
+      return Result.fail("Window must be 5 or 60 minutes, and limit must be 1-100.");
     }
     List<Map<String, Object>> rows = null;
     try {

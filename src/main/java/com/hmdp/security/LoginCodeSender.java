@@ -24,7 +24,7 @@ public class LoginCodeSender {
   @Value("${hmdp.mail.log-codes:false}")
   private boolean logCodes;
 
-  @Value("${hmdp.mail.from:no-reply@hmdp.local}")
+  @Value("${hmdp.mail.from:no-reply@harbourdrop.local}")
   private String from;
 
   public LoginCodeSender(ObjectProvider<JavaMailSender> mailSender) {
@@ -38,7 +38,7 @@ public class LoginCodeSender {
       SimpleMailMessage message = new SimpleMailMessage();
       message.setFrom(from);
       message.setTo(email);
-      message.setSubject("Your HMDP sign-in code");
+      message.setSubject("Your HarbourDrop sign-in code");
       message.setText("Your sign-in code is " + code + ". It expires in 2 minutes.");
       sender.send(message);
       return true;

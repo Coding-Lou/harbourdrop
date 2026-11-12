@@ -1,6 +1,7 @@
 package com.hmdp.service.impl;
 
 import com.hmdp.dto.Result;
+import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.Voucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.enums.OrderStatus;
@@ -23,6 +24,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
@@ -39,12 +42,6 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * 服务实现类
- *
- * @author 虎哥
- * @since 2021-12-22
- */
 @Slf4j
 @Service
 public class VoucherOrderServiceImpl implements IVoucherOrderService {
@@ -104,7 +101,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
     Long voucherId = voucherOrder.getVoucherId();
     RLock lock = redissonClient.getLock("lock:order:" + userId);
     if (!lock.tryLock()) {
-      throw new IllegalStateException("订单锁忙，保留消息重试");
+      throw new IllegalStateException("Order lock busy; keeping the message for retry");
     }
     try {
       transactionTemplate.execute(
@@ -116,7 +113,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
             if (existing != null) {
               if (!userId.equals(existing.getUserId())
                   || !voucherId.equals(existing.getVoucherId())) {
-                throw new IllegalStateException("订单号冲突");
+                throw new IllegalStateException("Order ID conflict");
               }
               if (coordinator != null) {
                 coordinator.markReservationSuccessful(voucherOrder.getId());
@@ -124,15 +121,16 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
               return null;
             }
             if (voucherOrderRepository.countByUserIdAndVoucherId(userId, voucherId) > 0) {
-              throw new IllegalStateException("资格对应的订单号不一致，保留消息核对");
+              throw new IllegalStateException(
+                  "Admission order ID mismatch; keeping the message for review");
             }
             boolean deducted = seckillVoucherService.deductStock(voucherId);
             if (!deducted) {
-              throw new IllegalStateException("库存不足，保留消息核对");
+              throw new IllegalStateException("Insufficient stock; keeping the message for review");
             }
             Voucher voucher = voucherService.getById(voucherId);
             if (voucher == null) {
-              throw new IllegalStateException("商品不存在，保留消息核对");
+              throw new IllegalStateException("Item not found; keeping the message for review");
             }
             snapshot(voucherOrder, voucher);
             voucherOrder.setStatus(initialOrderStatus(voucher));
@@ -154,11 +152,11 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
   @Override
   public Result seckillVoucher(Long voucherId) {
     if (voucherId == null || voucherId <= 0) {
-      return Result.fail("秒杀券参数无效");
+      return Result.fail("Invalid drop.");
     }
     Long userId = UserHolder.getUser().getId();
     long orderId = redisIdWorker.nextId("order");
-    // 1.执行lua脚本
+    // 1. Run the Lua script
     long started = System.nanoTime();
     Long result;
     try {
@@ -179,7 +177,8 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
       if (metrics != null) {
         metrics.counter("hmdp.seckill.admissions", "result", "transport_error").increment();
       }
-      return Result.fail("订单服务暂时不可用，请稍后查询订单状态");
+      return Result.fail(
+          "Order service is temporarily unavailable. Check your order status later.");
     } finally {
       if (metrics != null) {
         metrics
@@ -193,12 +192,12 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
           .increment();
     }
     if (result == null) {
-      return Result.fail("订单服务暂时不可用");
+      return Result.fail("Order service is temporarily unavailable.");
     }
     int admissionCode = result.intValue();
-    // 2.判断结果是否为0
+    // 2. Check whether the result is 0
     if (admissionCode != 0) {
-      // 2.1.不为0 ，代表没有购买资格
+      // 2.1. Non-zero means no purchase admission
       if (admissionCode == 2) {
         Object original =
             stringRedisTemplate
@@ -213,12 +212,16 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
         if (existing != null) {
           return Result.ok(existing.getId());
         }
-        return Result.fail("已有抢购资格，请查询处理状态");
+        return Result.fail("You have already claimed this drop.");
       }
       return Result.fail(
-          admissionCode == 1 ? "库存不足" : admissionCode == 3 ? "活动尚未就绪、已暂停或不在购买时段" : "活动数据异常，请稍后重试");
+          admissionCode == 1
+              ? "Out of stock."
+              : admissionCode == 3
+                  ? "This drop isn't open right now."
+                  : "Something went wrong with this drop. Please try again later.");
     }
-    // 3.返回订单id
+    // 3. Return the order ID
     return Result.ok(orderId);
   }
 
@@ -227,7 +230,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
     Long userId = UserHolder.getUser().getId();
     RLock lock = redissonClient.getLock("lock:order:ordinary:" + userId);
     if (!lock.tryLock()) {
-      return Result.fail("订单正在处理，请稍后查询");
+      return Result.fail("Your order is being processed. Check back shortly.");
     }
     try {
       return transactionTemplate.execute(
@@ -240,7 +243,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
                 || voucher.getStatus() != 1
                 || voucher.getType() == null
                 || !VoucherType.ORDINARY.matches(voucher.getType())) {
-              return Result.fail("普通券不存在或已下架");
+              return Result.fail("Deal not found or no longer available.");
             }
             VoucherOrder existing =
                 voucherOrderRepository
@@ -254,7 +257,8 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
             order.setUserId(userId);
             order.setVoucherId(voucherId);
             snapshot(order, voucher);
-            // 免费券直接领取；付费券只创建待支付订单，不能冒充支付成功。
+            // Free deals are claimed directly; paid deals only create a pending-payment order
+            // and must never pass as paid.
             order.setStatus(initialOrderStatus(voucher));
             voucherOrderRepository.insert(order);
             lifecycle.registerOrderCreatedEventAndDeadline(order.getId());
@@ -269,7 +273,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
   public Result queryMyOrder(Long orderId) {
     VoucherOrder order = getById(orderId);
     if (order == null || !UserHolder.getUser().getId().equals(order.getUserId())) {
-      return Result.fail("订单不存在");
+      return Result.fail("Order not found.");
     }
     Map<String, Object> detail = BeanMaps.toMap(order);
     Voucher voucher = voucherService.getById(order.getVoucherId());
@@ -303,7 +307,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
   @Override
   public Result queryMyOrders(Integer page, boolean heldOnly) {
     if (page == null || page < 1 || page > 10000) {
-      return Result.fail("分页参数无效");
+      return Result.fail("Invalid paging parameters.");
     }
     Long owner = UserHolder.getUser().getId();
     PageRequest request = PageRequest.of(page - 1, 20, NEWEST_FIRST);
@@ -323,6 +327,17 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
                         .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Voucher::getId, v -> v));
+    // Drops carry a pickup window; read it in one batch for the drops on this page.
+    Set<Long> dropIds =
+        vouchers.values().stream()
+            .filter(v -> Objects.equals(v.getType(), 1))
+            .map(Voucher::getId)
+            .collect(Collectors.toSet());
+    Map<Long, SeckillVoucher> drops =
+        dropIds.isEmpty()
+            ? Collections.emptyMap()
+            : seckillVoucherService.listByIds(dropIds).stream()
+                .collect(Collectors.toMap(SeckillVoucher::getVoucherId, d -> d));
     List<Map<String, Object>> items = new ArrayList<>();
     for (VoucherOrder order : result.getContent()) {
       Voucher voucher = vouchers.get(order.getVoucherId());
@@ -350,6 +365,11 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
             "rules",
             order.getRulesSnapshot() == null ? voucher.getRules() : order.getRulesSnapshot());
       }
+      SeckillVoucher drop = drops.get(order.getVoucherId());
+      if (drop != null) {
+        item.put("pickup_begin_time", drop.getPickupBeginTime());
+        item.put("pickup_end_time", drop.getPickupEndTime());
+      }
       items.add(item);
     }
     return Result.ok(items, result.getTotalElements());
@@ -358,14 +378,14 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
   @Override
   public Result payMockOrder(Long orderId, Long expectedPayCents) {
     if (!mockPaymentEnabled) {
-      return Result.fail("本地模拟支付未启用");
+      return Result.fail("Local mock payment is disabled.");
     }
     return transactionTemplate.execute(
         tx -> {
           Long userId = UserHolder.getUser().getId();
           VoucherOrder order = getById(orderId);
           if (order == null || !userId.equals(order.getUserId())) {
-            return Result.fail("订单不存在");
+            return Result.fail("Order not found.");
           }
           Voucher voucher = voucherService.getById(order.getVoucherId());
           Long payable =
@@ -373,13 +393,13 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
                   ? (voucher == null ? null : voucher.getPayValue())
                   : order.getPayValueSnapshot();
           if (payable == null || payable <= 0 || !payable.equals(expectedPayCents)) {
-            return Result.fail("支付金额不匹配，请重新查询");
+            return Result.fail("Payment amount doesn't match. Please refresh the order.");
           }
           if (OrderStatus.PAID.matches(order.getStatus())) {
             return Result.ok(orderId.toString());
           }
           if (!OrderStatus.UNPAID.matches(order.getStatus())) {
-            return Result.fail("订单不是待支付状态");
+            return Result.fail("This order is not awaiting payment.");
           }
           boolean changed =
               voucherOrderRepository.markPaidIfUnpaidAndNotExpired(
@@ -394,7 +414,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
             if (latest == null
                 || !userId.equals(latest.getUserId())
                 || !OrderStatus.PAID.matches(latest.getStatus())) {
-              return Result.fail("订单状态已变化，请刷新后重试");
+              return Result.fail("Order status has changed. Please refresh and try again.");
             }
           }
           if (changed) {
@@ -411,7 +431,7 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
           Long userId = UserHolder.getUser().getId();
           VoucherOrder order = getById(orderId);
           if (order == null || !userId.equals(order.getUserId())) {
-            return Result.fail("订单不存在");
+            return Result.fail("Order not found.");
           }
           Voucher voucher = voucherService.getById(order.getVoucherId());
           if (voucher == null
@@ -419,13 +439,13 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
               || !VoucherType.ORDINARY.matches(voucher.getType())
               || voucher.getPayValue() == null
               || voucher.getPayValue() <= 0) {
-            return Result.fail("仅支持取消未支付的普通券订单");
+            return Result.fail("Only unpaid deal orders can be cancelled.");
           }
           if (OrderStatus.CANCELLED.matches(order.getStatus())) {
             return Result.ok(orderId);
           }
           if (!OrderStatus.UNPAID.matches(order.getStatus())) {
-            return Result.fail("订单不是待支付状态");
+            return Result.fail("This order is not awaiting payment.");
           }
           boolean changed =
               voucherOrderRepository.changeStatusIfCurrent(
@@ -437,7 +457,9 @@ public class VoucherOrderServiceImpl implements IVoucherOrderService {
           if (changed) {
             lifecycle.registerOrderClosedEvent(orderId, userId);
           }
-          return changed ? Result.ok(orderId) : Result.fail("订单状态已变化，请刷新后重试");
+          return changed
+              ? Result.ok(orderId)
+              : Result.fail("Order status has changed. Please refresh and try again.");
         });
   }
 

@@ -32,7 +32,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
   @Override
   public void appendBusinessEvent(String kind, long aggregateId, Long userId) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("Outbox 必须与业务写入同事务");
+      throw new IllegalStateException("Outbox must share the business write transaction");
     }
     businessOutboxRepository.insertEvent(kind, aggregateId, userId);
   }
@@ -40,7 +40,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
   @Override
   public void appendMediaDeletionEvent(String path, long userId) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("图片删除事件需要业务事务");
+      throw new IllegalStateException("Image deletion event requires a business transaction");
     }
     businessOutboxRepository.insertMediaDeletion(userId, userId, path);
   }
@@ -55,7 +55,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
             try {
               cache.invalidate("cache:shop:" + shopId);
             } catch (RuntimeException e) {
-              log.warn("提交后失效失败，Outbox 将重试", e);
+              log.warn("Post-commit invalidation failed; the outbox will retry", e);
             }
           }
         });
@@ -64,7 +64,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
   @Override
   public void appendOrderExpirationEvent(long orderId, Long userId, Timestamp deadline) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("订单截止时间事件需要业务事务");
+      throw new IllegalStateException("Order deadline event requires a business transaction");
     }
     businessOutboxRepository.insertDeadline(orderId, userId, deadline);
   }

@@ -13,7 +13,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * @author 虎哥
+ * Extended user profile.
+ *
  * @since 2021-12-24
  */
 @Data
@@ -27,36 +28,36 @@ public class UserInfo implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 主键，用户id */
+  /** Primary key; the user ID */
   @Id private Long userId;
 
-  /** 城市名称 */
+  /** City name */
   private String city;
 
-  /** 个人介绍，不要超过128个字符 */
+  /** Bio, at most 128 characters */
   private String introduce;
 
-  /** 粉丝数量 */
+  /** Follower count */
   private Integer fans;
 
-  /** 关注的人的数量 */
+  /** Following count */
   private Integer followee;
 
-  /** 性别，0：男，1：女 */
+  /** Gender: 0 male, 1 female */
   private Boolean gender;
 
-  /** 生日 */
+  /** Birthday */
   private LocalDate birthday;
 
-  /** 积分 */
+  /** Points */
   private Integer credits;
 
-  /** 会员级别，0~9级,0代表未开通会员 */
+  /** Membership level 0-9; 0 means not a member */
   private Boolean level;
 
-  /** 创建时间 */
+  /** Created at */
   private LocalDateTime createTime;
 
-  /** 更新时间 */
+  /** Updated at */
   private LocalDateTime updateTime;
 }

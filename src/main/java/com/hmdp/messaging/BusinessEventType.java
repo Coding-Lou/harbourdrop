@@ -1,6 +1,9 @@
 package com.hmdp.messaging;
 
-/** 消息类型与逻辑消费组；名称同时是数据库和消息中的稳定协议值。 */
+/**
+ * Message types and logical consumer groups; the names are also stable protocol values in the
+ * database and in messages.
+ */
 public enum BusinessEventType {
   FEED("feed"),
   LIKE("relations"),
@@ -31,6 +34,6 @@ public enum BusinessEventType {
         return type;
       }
     }
-    throw new IllegalArgumentException("未知事件类型: " + kind);
+    throw new IllegalArgumentException("Unknown event type: " + kind);
   }
 }

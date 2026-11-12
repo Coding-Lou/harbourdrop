@@ -5,7 +5,7 @@ import java.sql.Timestamp;
 import java.util.Map;
 import lombok.Data;
 
-/** 活动发布所需的当前库存、时间窗口和上架状态。 */
+/** Current stock, time window, and listing status needed to publish a campaign. */
 @Data
 public class SeckillPublication {
   private Long voucherId;

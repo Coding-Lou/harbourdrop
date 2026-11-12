@@ -9,7 +9,7 @@ import lombok.Data;
 import org.hibernate.annotations.Immutable;
 
 /**
- * 秒杀持久资格；订单、用户与券的身份必须在重放时保持一致。
+ * Durable flash-sale claim; the order, user, and voucher identity must stay the same on replay.
  *
  * <p>Immutable entity used only to type the repository; read through {@link #fromRow}.
  */

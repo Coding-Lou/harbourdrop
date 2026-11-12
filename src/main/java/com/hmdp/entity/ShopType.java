@@ -15,7 +15,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * @author 虎哥
+ * A shop category.
+ *
  * @since 2021-12-22
  */
 @Data
@@ -29,23 +30,23 @@ public class ShopType implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 主键 */
+  /** Primary key */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** 类型名称 */
+  /** Type name */
   private String name;
 
-  /** 图标 */
+  /** Icon */
   private String icon;
 
-  /** 顺序 */
+  /** Sort order */
   private Integer sort;
 
-  /** 创建时间 */
+  /** Created at */
   @JsonIgnore private LocalDateTime createTime;
 
-  /** 更新时间 */
+  /** Updated at */
   @JsonIgnore private LocalDateTime updateTime;
 }

@@ -4,15 +4,14 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.VoucherOrder;
 
 /**
- * 服务类
+ * Voucher order service.
  *
- * @author 虎哥
  * @since 2021-12-22
  */
 public interface IVoucherOrderService {
   VoucherOrder getById(Long orderId);
 
-  /** 条件扣库存与保存订单在同一事务内完成；用户锁覆盖事务提交。 */
+  /** Conditional stock deduction and order save share a transaction; the user lock spans commit. */
   void persistSeckill(VoucherOrder order);
 
   Result seckillVoucher(Long voucherId);

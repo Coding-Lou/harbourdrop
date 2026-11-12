@@ -103,7 +103,8 @@ public class DebeziumCacheConsumer {
       return;
     }
     if (!schema.matches("[A-Za-z0-9_]+")) {
-      throw new IllegalArgumentException("CDC schema 名称只允许字母、数字和下划线");
+      throw new IllegalArgumentException(
+          "CDC schema name may only contain letters, digits, and underscores");
     }
     ContainerProperties properties = new ContainerProperties(topics());
     properties.setGroupId(group);
@@ -195,7 +196,8 @@ public class DebeziumCacheConsumer {
       metrics.counter("hmdp.cdc.batches", "result", relevant ? "success" : "ignored").increment();
     } catch (Exception failure) {
       metrics.counter("hmdp.cdc.batches", "result", "retry").increment();
-      throw new IllegalStateException("缓存 CDC 批次失败，保留位点重放", failure);
+      throw new IllegalStateException(
+          "Cache CDC batch failed; keeping the offset for replay", failure);
     }
   }
 

@@ -43,31 +43,31 @@ public class AccessGuard implements HandlerInterceptor {
     // Defense in depth next to the Security firewall: reject URIs whose raw form differs from the
     // path used for routing (";params", "%xx", "//", dot segments).
     if (isAmbiguousUri(req.getRequestURI())) {
-      return reject(res, 400, "请求路径无效");
+      return reject(res, 400, "Invalid request path.");
     }
     String path = UrlPathHelper.defaultInstance.getLookupPathForRequest(req);
     boolean read = "GET".equals(req.getMethod()) || "HEAD".equals(req.getMethod());
     if (path.startsWith("/experience/")
         && !limits.allow("experience-ip:" + req.getRemoteAddr(), 60, 60000)) {
-      return reject(res, 429, "体验请求较多，请稍后重试");
+      return reject(res, 429, "Too many demo requests. Please try again shortly.");
     }
     boolean login =
         path.equals("/user/code") || path.equals("/user/login") || path.equals("/user/refresh");
     if (login && !limits.allow("auth-ip:" + req.getRemoteAddr(), 30, 60000)) {
-      return reject(res, 429, "请求过于频繁");
+      return reject(res, 429, "Too many requests. Please try again shortly.");
     }
     UserDTO user = UserHolder.getUser();
     if (user != null && path.startsWith("/voucher-order/seckill/") && !read) {
       if (!limits.allow("claim-user:" + user.getId(), 10, 1000)
           || !limits.allow("claim-global", 1000, 1000)) {
-        return reject(res, 429, "抢购繁忙，请稍后重试");
+        return reject(res, 429, "This drop is busy right now. Please try again shortly.");
       }
     }
     if (user != null
         && read
         && path.startsWith("/voucher-order/")
         && !limits.allow("order-read:" + user.getId(), 30, 1000)) {
-      return reject(res, 429, "查询过于频繁");
+      return reject(res, 429, "Too many order lookups. Please try again shortly.");
     }
     return true;
   }

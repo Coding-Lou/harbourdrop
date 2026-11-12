@@ -14,7 +14,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * @author 虎哥
+ * One user following another.
+ *
  * @since 2021-12-22
  */
 @Data
@@ -28,17 +29,17 @@ public class Follow implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 主键 */
+  /** Primary key */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** 用户id */
+  /** User ID */
   private Long userId;
 
-  /** 关联的用户id */
+  /** ID of the followed user */
   private Long followUserId;
 
-  /** 创建时间 */
+  /** Created at */
   private LocalDateTime createTime;
 }

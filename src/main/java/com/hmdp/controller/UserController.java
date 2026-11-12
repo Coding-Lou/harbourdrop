@@ -20,9 +20,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 前端控制器
- *
- * @author 虎哥
+ * REST controller for users and sign-in.
  */
 @Slf4j
 @RestController
@@ -35,25 +33,28 @@ public class UserController {
   @Resource
   private IUserInfoService userInfoService;
 
-  /** 发送邮箱验证码（一次性，2 分钟有效）。 */
+  /** Sends a one-time email verification code, valid for 2 minutes. */
   @PostMapping("code")
   public Result sendCode(@RequestParam("email") String email) {
     return userService.sendCode(email);
   }
 
-  /** 邮箱验证码登录；首次登录自动注册。返回 access token（JWT）与一次性 refresh token。 */
+  /**
+   * Signs in with an email code, registering on first sign-in. Returns an access token (JWT) and a
+   * single-use refresh token.
+   */
   @PostMapping("/login")
   public Result login(@RequestBody LoginFormDTO loginForm) {
     return userService.login(loginForm);
   }
 
-  /** 用 refresh token 换取新的令牌对；旧 refresh token 随即失效。 */
+  /** Exchanges a refresh token for a new token pair; the old refresh token stops working. */
   @PostMapping("/refresh")
   public Result refresh(@RequestBody RefreshTokenDTO request) {
     return userService.refresh(request == null ? null : request.getRefreshToken());
   }
 
-  /** 吊销当前 access token 与（可选）refresh token。 */
+  /** Revokes the current access token and, optionally, the refresh token. */
   @PostMapping("/logout")
   public Result logout(
       @AuthenticationPrincipal Jwt accessToken,
@@ -63,7 +64,7 @@ public class UserController {
 
   @GetMapping("/me")
   public Result me() {
-    // 获取当前登录的用户并返回
+    // Return the currently signed-in user
     UserDTO user = UserHolder.getUser();
     return Result.ok(user);
   }

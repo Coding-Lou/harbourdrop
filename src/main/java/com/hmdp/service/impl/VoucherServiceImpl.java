@@ -28,12 +28,6 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * 服务实现类
- *
- * @author 虎哥
- * @since 2021-12-22
- */
 @Service
 public class VoucherServiceImpl implements IVoucherService {
   @Resource
@@ -102,6 +96,8 @@ public class VoucherServiceImpl implements IVoucherService {
         voucher.setStock(activity.getStock());
         voucher.setBeginTime(activity.getBeginTime());
         voucher.setEndTime(activity.getEndTime());
+        voucher.setPickupBeginTime(activity.getPickupBeginTime());
+        voucher.setPickupEndTime(activity.getPickupEndTime());
       }
       boolean active =
           Objects.equals(voucher.getType(), 0)
@@ -115,21 +111,23 @@ public class VoucherServiceImpl implements IVoucherService {
       voucher.setOrderable(active);
       vouchers.add(voucher);
     }
-    // 返回结果
+    // Return the result
     return Result.ok(vouchers);
   }
 
   @Override
   @Transactional
   public void addSeckillVoucher(Voucher voucher) {
-    // 保存优惠券
+    // Save the voucher
     voucherRepository.insert(voucher);
-    // 保存秒杀信息
+    // Save the seckill details
     SeckillVoucher seckillVoucher = new SeckillVoucher();
     seckillVoucher.setVoucherId(voucher.getId());
     seckillVoucher.setStock(voucher.getStock());
     seckillVoucher.setBeginTime(voucher.getBeginTime());
     seckillVoucher.setEndTime(voucher.getEndTime());
+    seckillVoucher.setPickupBeginTime(voucher.getPickupBeginTime());
+    seckillVoucher.setPickupEndTime(voucher.getPickupEndTime());
     seckillVoucherService.save(seckillVoucher);
     seckillVoucherRepository.insertActivity(voucher.getId(), voucher.getStock());
     outbox.appendBusinessEvent("SECKILL_PUBLISH", voucher.getId(), null);
@@ -150,13 +148,13 @@ public class VoucherServiceImpl implements IVoucherService {
 
   private String validate(Voucher v, boolean seckill) {
     if (!canManage()) {
-      return "当前账号没有演示商品管理权限";
+      return "This account can't manage demo listings.";
     }
     if (v.getId() != null
         || v.getShopId() == null
         || v.getShopId() <= 0
         || shopService.getById(v.getShopId()) == null) {
-      return "关联店铺不存在或参数无效";
+      return "Shop not found or parameters are invalid.";
     }
     if (v.getTitle() == null
         || v.getTitle().trim().isEmpty()
@@ -165,7 +163,7 @@ public class VoucherServiceImpl implements IVoucherService {
         || v.getRules().trim().isEmpty()
         || v.getRules().length() > 1000
         || (v.getSubTitle() != null && v.getSubTitle().length() > 200)) {
-      return "标题或规则无效";
+      return "Invalid title or rules.";
     }
     if (v.getPayValue() == null
         || v.getActualValue() == null
@@ -173,7 +171,7 @@ public class VoucherServiceImpl implements IVoucherService {
         || v.getActualValue() <= 0
         || v.getActualValue() > 10000000
         || v.getPayValue() > v.getActualValue()) {
-      return "券金额无效";
+      return "Invalid price or value.";
     }
     if (seckill
         && (v.getStock() == null
@@ -182,16 +180,30 @@ public class VoucherServiceImpl implements IVoucherService {
             || v.getBeginTime() == null
             || v.getEndTime() == null
             || !v.getEndTime().isAfter(v.getBeginTime()))) {
-      return "秒杀库存或时间无效";
+      return "Invalid drop stock or time window.";
+    }
+    if (seckill && !validPickupWindow(v)) {
+      return "Invalid pickup window. Set both times, starting no earlier than the drop opens.";
     }
     v.setType(seckill ? 1 : 0);
     v.setStatus(1);
     v.setCreateTime(null);
     v.setUpdateTime(null);
-    if (!v.getTitle().startsWith("【演示】")) {
-      v.setTitle("【演示】" + v.getTitle().trim());
+    if (!v.getTitle().startsWith("[Demo] ")) {
+      v.setTitle("[Demo] " + v.getTitle().trim());
     }
-    return v.getTitle().length() > 100 ? "标题过长" : null;
+    return v.getTitle().length() > 100 ? "Title is too long." : null;
+  }
+
+  /** A pickup window is optional; if given it needs both ends, in order, after the sale opens. */
+  private static boolean validPickupWindow(Voucher v) {
+    if (v.getPickupBeginTime() == null && v.getPickupEndTime() == null) {
+      return true;
+    }
+    return v.getPickupBeginTime() != null
+        && v.getPickupEndTime() != null
+        && !v.getPickupBeginTime().isBefore(v.getBeginTime())
+        && v.getPickupEndTime().isAfter(v.getPickupBeginTime());
   }
 
   @Override

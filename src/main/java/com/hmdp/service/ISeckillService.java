@@ -3,14 +3,17 @@ package com.hmdp.service;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.VoucherOrder;
 
-/** 秒杀请求持久化、投递与人工核对。 */
+/** Flash-sale request persistence, delivery, and manual reconciliation. */
 public interface ISeckillService {
   String STREAM = "stream.orders";
   String GROUP = "g1";
 
   void fulfillReservationFromMessage(long orderId);
 
-  /** 在订单事务内锁预约；返回 false 表示已有终态，不能再次扣库存。 */
+  /**
+   * Locks the reservation inside the order transaction; false means it already reached a terminal
+   * state and stock must not be deducted again.
+   */
   boolean lockReservationForFulfillment(VoucherOrder order);
 
   void markReservationSuccessful(long orderId);
@@ -21,14 +24,14 @@ public interface ISeckillService {
 
   Result publishActivity(long voucherId);
 
-  /** 人工核对后的恢复入口，与首次发布使用不同准入检查。 */
+  /** Recovery entry point after manual review; uses different admission checks than publishing. */
   Result recoverActivity(long voucherId);
 
   Result retryReservation(long orderId);
 
   Result markReservationFailedAndCompensateRedis(long orderId);
 
-  /** 只生成对账报告，不自动修复库存。 */
+  /** Only produces a reconciliation report; never repairs stock automatically. */
   Result queryInventoryReconciliationReport(long voucherId);
 
   Result queryReservationsForReview();

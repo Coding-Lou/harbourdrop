@@ -165,7 +165,8 @@ class MessagingIntegrationTest extends IntegrationTestBase {
       for (int i = 0; i < 202; i++) {
         long followerId = firstFollowerId + i;
         feedKeys.add("feed:" + followerId);
-        // 201 人在发布前关注；最后一人发布后才关注，不应收到这条历史笔记。
+        // 201 users follow before publishing; the last one follows afterwards and must not get
+        // this earlier post.
         jdbc.update(
             "INSERT INTO tb_follow_edge(user_id,follow_user_id,created_at) "
                 + "VALUES(?,?,TIMESTAMPADD(SECOND,?,NOW()))",

@@ -14,9 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 前端控制器
- *
- * @author 虎哥
+ * REST controller for posts.
  */
 @RestController
 @RequestMapping("/blog")
@@ -50,7 +48,7 @@ public class BlogController {
     return blogService.queryHotBlog(current);
   }
 
-  /** CityLens 使用的按店铺查询探店笔记接口。 */
+  /** Lists posts for a shop; used by CityLens. */
   @GetMapping("/of/shop")
   public Result queryBlogByShop(
       @RequestParam("shopId") Long shopId,
@@ -58,7 +56,7 @@ public class BlogController {
     return blogService.queryBlogByShop(shopId, current);
   }
 
-  /** CityLens 只读证据检索：限定店铺后按标题或正文关键词查笔记。 */
+  /** Read-only evidence lookup for CityLens: searches a shop's posts by title or body keyword. */
   @GetMapping("/search")
   public Result searchBlogEvidence(
       @RequestParam("shopId") Long shopId,

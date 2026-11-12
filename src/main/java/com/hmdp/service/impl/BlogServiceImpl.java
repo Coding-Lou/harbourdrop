@@ -34,12 +34,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * 服务实现类
- *
- * @author 虎哥
- * @since 2021-12-22
- */
 @Service
 public class BlogServiceImpl implements IBlogService {
   @Resource
@@ -92,14 +86,14 @@ public class BlogServiceImpl implements IBlogService {
 
   @Override
   public Result queryHotBlog(Integer current) {
-    // 根据用户查询
+    // Query by user
     Page<Blog> page =
         blogRepository.findAll(
             pageOf(
                 current,
                 SystemConstants.MAX_PAGE_SIZE,
                 Sort.by(Sort.Order.desc("liked"), Sort.Order.desc("id"))));
-    // 获取当前页数据
+    // Get the current page of data
     List<Blog> records = page.getContent();
     enrich(records);
     return Result.ok(records);
@@ -107,23 +101,23 @@ public class BlogServiceImpl implements IBlogService {
 
   @Override
   public Result queryBlogById(Long id) {
-    // 1.查询blog
+    // 1. Query the blog
     Blog blog = getById(id);
     if (blog == null) {
-      return Result.fail("笔记不存在！");
+      return Result.fail("Post not found.");
     }
-    // 2.查询blog有关的用户
+    // 2. Query the blog's author
     queryBlogUser(blog);
-    // 3.查询blog是否被点赞
+    // 3. Check whether the blog is liked
     isBlogLiked(blog);
     return Result.ok(blog);
   }
 
   private void isBlogLiked(Blog blog) {
-    // 1.获取登录用户
+    // 1. Get the logged-in user
     UserDTO user = UserHolder.getUser();
     if (user == null) {
-      // 用户未登录，无需查询是否点赞
+      // Not logged in, so no need to check likes
       return;
     }
     blog.setIsLike(blogRepository.countLike(blog.getId(), user.getId()) > 0);
@@ -144,7 +138,7 @@ public class BlogServiceImpl implements IBlogService {
     return transactions.execute(
         tx -> {
           if (blogRepository.selectIdForUpdate(id).isEmpty()) {
-            return Result.fail("笔记不存在");
+            return Result.fail("Post not found.");
           }
           boolean current = blogRepository.countLike(id, user) > 0;
           boolean desired = requested == null ? !current : requested;
@@ -169,19 +163,19 @@ public class BlogServiceImpl implements IBlogService {
     if (ids.isEmpty()) {
       return Result.ok(Collections.emptyList());
     }
-    // 3.根据用户id查询用户，并保持点赞先后顺序
+    // 3. Query users by ID, preserving the order of likes
     List<UserDTO> userDTOS =
         inIdOrder(ids, userService.listByIds(ids), User::getId).stream()
             .map(UserDTO::from)
             .collect(Collectors.toList());
-    // 4.返回
+    // 4. Return
     return Result.ok(userDTOS);
   }
 
   @Override
   @Transactional
   public Result saveBlog(Blog blog) {
-    // 1.获取登录用户
+    // 1. Get the logged-in user
     UserDTO user = UserHolder.getUser();
     blog.setUserId(user.getId());
     if (blog.getImages() == null) {
@@ -189,10 +183,10 @@ public class BlogServiceImpl implements IBlogService {
     }
     if (blog.getImages().length() > 2048
         || (!blog.getImages().isEmpty() && blog.getImages().split(",").length > 9)) {
-      return Result.fail("图片数量或路径长度无效");
+      return Result.fail("Invalid image count or path length.");
     }
     if (!media.lockOwnedImages(blog.getImages(), user.getId())) {
-      return Result.fail("图片不存在、不属于当前账号或正在删除");
+      return Result.fail("Image not found, not yours, or being deleted.");
     }
     blog.setId(null);
     blog.setLiked(0);
@@ -206,9 +200,9 @@ public class BlogServiceImpl implements IBlogService {
         || blog.getContent().length() > 10000
         || blog.getShopId() == null
         || shopRepository.countByShopId(blog.getShopId()) == 0) {
-      return Result.fail("笔记内容或关联店铺无效");
+      return Result.fail("Invalid post content or shop.");
     }
-    // 2.保存探店笔记
+    // 2. Save the shop post
     blogRepository.insert(blog);
     media.attach(blog.getId(), blog.getImages());
     outbox.appendBusinessEvent("FEED", blog.getId(), user.getId());
@@ -217,24 +211,24 @@ public class BlogServiceImpl implements IBlogService {
 
   @Override
   public Result queryBlogOfFollow(Long max, Integer offset) {
-    // 1.获取当前用户
+    // 1. Get the current user
     Long userId = UserHolder.getUser().getId();
-    // 2.查询收件箱 ZREVRANGEBYSCORE key Max Min LIMIT offset count
+    // 2. Query the inbox: ZREVRANGEBYSCORE key Max Min LIMIT offset count
     String key = RedisConstants.FEED_KEY + userId;
     Set<ZSetOperations.TypedTuple<String>> typedTuples =
         stringRedisTemplate.opsForZSet().reverseRangeByScoreWithScores(key, 0, max, offset, 2);
-    // 3.非空判断
+    // 3. Check for an empty result
     if (typedTuples == null || typedTuples.isEmpty()) {
       return Result.ok();
     }
-    // 4.解析数据：blogId、minTime（时间戳）、offset
+    // 4. Parse the data: blogId, minTime (timestamp), offset
     List<Long> ids = new ArrayList<>(typedTuples.size());
     long minTime = 0; // 2
     int os = 1; // 2
     for (ZSetOperations.TypedTuple<String> tuple : typedTuples) { // 5 4 4 2 2
-      // 4.1.获取id
+      // 4.1. Get the ID
       ids.add(Long.valueOf(tuple.getValue()));
-      // 4.2.获取分数(时间戳）
+      // 4.2. Get the score (timestamp)
       long time = tuple.getScore().longValue();
       if (time == minTime) {
         os++;
@@ -244,11 +238,11 @@ public class BlogServiceImpl implements IBlogService {
       }
     }
 
-    // 5.根据id查询blog
+    // 5. Query blogs by ID
     List<Blog> blogs = inIdOrder(ids, blogRepository.findAllById(ids), Blog::getId);
 
     enrich(blogs);
-    // 6.封装并返回
+    // 6. Wrap and return
     ScrollResult r = new ScrollResult();
     r.setList(blogs);
     r.setOffset(minTime == max ? offset + os : os);
@@ -292,13 +286,13 @@ public class BlogServiceImpl implements IBlogService {
 
   @Override
   public Result queryMyBlog(Integer current) {
-    // 获取登录用户
+    // Get the logged-in user
     UserDTO user = UserHolder.getUser();
-    // 根据用户查询
+    // Query by user
     Page<Blog> page =
         blogRepository.findByUserId(
             user.getId(), pageOf(current, SystemConstants.MAX_PAGE_SIZE, Sort.unsorted()));
-    // 获取当前页数据
+    // Get the current page of data
     List<Blog> records = page.getContent();
     return Result.ok(records);
   }
@@ -306,7 +300,7 @@ public class BlogServiceImpl implements IBlogService {
   @Override
   public Result queryBlogByShop(Long shopId, Integer current) {
     if (shopId == null || shopId <= 0 || current < 1 || current > 100000) {
-      return Result.fail("shopId 和 current 必须是正整数");
+      return Result.fail("shopId and current must be positive integers.");
     }
     Page<Blog> page =
         blogRepository.findByShopId(
@@ -324,7 +318,7 @@ public class BlogServiceImpl implements IBlogService {
         || keyword == null
         || keyword.trim().length() < 2
         || keyword.trim().length() > 40) {
-      return Result.fail("shopId、keyword 或 current 不合法");
+      return Result.fail("Invalid shopId, keyword or current.");
     }
     String query = keyword.trim();
     Page<Blog> page =
@@ -337,11 +331,11 @@ public class BlogServiceImpl implements IBlogService {
 
   @Override
   public Result queryBlogByUserId(Integer current, Long id) {
-    // 根据用户查询
+    // Query by user
     Page<Blog> page =
         blogRepository.findByUserId(
             id, pageOf(current, SystemConstants.MAX_PAGE_SIZE, Sort.unsorted()));
-    // 获取当前页数据
+    // Get the current page of data
     List<Blog> records = page.getContent();
     return Result.ok(records);
   }

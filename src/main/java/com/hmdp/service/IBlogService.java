@@ -4,9 +4,8 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Blog;
 
 /**
- * 服务类
+ * Post service.
  *
- * @author 虎哥
  * @since 2021-12-22
  */
 public interface IBlogService {

@@ -1,4 +1,12 @@
-import { createApi, images, imagePath, money, safeReturn } from "./api.js";
+import {
+  createApi,
+  formatDate,
+  formatWindow,
+  images,
+  imagePath,
+  money,
+  safeReturn,
+} from "./api.js";
 import "./components.js";
 import "./experience.js";
 
@@ -172,7 +180,7 @@ app = new Vue({
       return this.shops.length < this.catalogTotal;
     },
     profileName() {
-      return this.profileUser ? this.profileUser.nickName : "探店记录员";
+      return this.profileUser ? this.profileUser.nickName : "Local foodie";
     },
   },
   created() {
@@ -214,45 +222,38 @@ app = new Vue({
     images,
     imagePath,
     money,
+    formatWindow,
     typeName(id) {
       const type = this.types.find((item) => String(item.id) === String(id));
-      return type ? type.name : "本地好店";
+      return type ? type.name : "Local favourites";
     },
     typeIcon(id) {
       return (
         {
-          1: "knife-fork",
-          2: "microphone",
-          3: "female",
-          10: "magic-stick",
-          5: "coffee-cup",
-          6: "cherry",
-          7: "user",
-          8: "goblet",
-          9: "house",
-          4: "basketball",
+          1: "dessert", // Bakeries
+          2: "coffee-cup", // Cafés
+          3: "dish", // Sushi & Japanese
+          4: "food", // Dim Sum & Chinese
+          5: "knife-fork", // Pizza & Italian
+          6: "sunrise", // Brunch
+          7: "grape", // Plant-based
+          8: "shopping-bag-1", // Grocery & Deli
         }[id] || "discover"
       );
     },
     date(value) {
-      if (!value) {
-        return "—";
-      }
-      const time = new Date(value);
-      return Number.isNaN(time.getTime())
-        ? "—"
-        : time.toLocaleDateString("zh-CN");
+      return formatDate(value);
     },
     orderStatus(status) {
       return (
         {
-          1: "待付款",
-          2: "已领取",
-          3: "已使用",
-          4: "已取消",
-          5: "退款中",
-          6: "已退款",
-        }[status] || "处理中"
+          1: "Awaiting payment",
+          2: "Claimed",
+          3: "Redeemed",
+          4: "Cancelled",
+          5: "Refund in progress",
+          6: "Refunded",
+        }[status] || "Processing"
       );
     },
     notify(message, kind = "success") {
@@ -264,7 +265,7 @@ app = new Vue({
     },
     showError(error) {
       if (error.status !== 401) {
-        this.notify(error.message || "操作失败，请重试", "error");
+        this.notify(error.message || "Something went wrong. Please try again.", "error");
       }
     },
     reload() {
@@ -355,14 +356,14 @@ app = new Vue({
           : this.blog
             ? this.blog.title
             : {
-                shops: "发现好店",
-                vouchers: "超值优惠",
+                shops: "Local spots",
+                vouchers: "Drops & deals",
                 profile: this.profileName,
-                orders: "我的订单",
-                publish: "发布探店笔记",
-                login: "欢迎回来",
-                experience: "体验验证",
-              }[this.page] || "发现身边的好去处") + " · 黑马点评";
+                orders: "My orders",
+                publish: "Write a review",
+                login: "Sign in",
+                experience: "Under the hood",
+              }[this.page] || "Surplus food drops near you") + " · HarbourDrop";
     },
     search() {
       location.assign(
@@ -518,11 +519,11 @@ app = new Vue({
     async loadShop() {
       const id = query.get("id");
       if (!/^\d+$/.test(id || "")) {
-        throw new Error("店铺地址无效，请从店铺列表重新进入");
+        throw new Error("This shop link is invalid. Please open it again from the shop list.");
       }
       this.shop = (await api("/shop/" + id)).data;
       if (!this.shop) {
-        throw new Error("没有找到这家店铺");
+        throw new Error("We couldn't find this shop.");
       }
       const results = await Promise.allSettled([
         api("/voucher/list/" + id),
@@ -531,7 +532,7 @@ app = new Vue({
       if (results[0].status === "fulfilled") {
         this.vouchers = results[0].value.data || [];
       } else {
-        this.notify("优惠券暂时加载失败，可刷新重试", "error");
+        this.notify("Drops and deals couldn't load. Refresh to try again.", "error");
       }
       if (results[1].status === "fulfilled") {
         this.shopBlogs = results[1].value.data || [];
@@ -540,16 +541,16 @@ app = new Vue({
     async loadBlog() {
       const id = query.get("id");
       if (!/^\d+$/.test(id || "")) {
-        throw new Error("笔记地址无效，请从首页重新进入");
+        throw new Error("This review link is invalid. Please open it again from the home page.");
       }
       this.blog = (await api("/blog/" + id)).data;
       if (!this.blog) {
-        throw new Error("没有找到这篇笔记");
+        throw new Error("We couldn't find this review.");
       }
       try {
         this.blogShop = (await api("/shop/" + this.blog.shopId)).data;
       } catch {
-        /* The note remains readable if its shop is unavailable. */
+        /* The review remains readable if its shop is unavailable. */
       }
       if (this.user && String(this.user.id) !== String(this.blog.userId)) {
         this.following = Boolean(
@@ -567,7 +568,7 @@ app = new Vue({
           method: "PUT",
         });
         this.following = !this.following;
-        this.notify(this.following ? "已关注这位作者" : "已取消关注");
+        this.notify(this.following ? "You're now following this reviewer." : "Unfollowed.");
       } catch (error) {
         this.showError(error);
       } finally {
@@ -606,7 +607,7 @@ app = new Vue({
           });
         }
         if (failures) {
-          this.notify("部分店铺的优惠加载失败，请稍后刷新重试", "error");
+          this.notify("Some shops' drops and deals didn't load. Refresh to try again.", "error");
         }
         this.offerHasMore = this.offerShopsPage * 20 < this.offerShopsTotal;
         this.offerShopsPage += 1;
@@ -655,7 +656,7 @@ app = new Vue({
           } catch {
             /* Leave the uncertain result visible; do not automatically resubmit. */
           }
-          this.notify("提交结果暂未确认，请到我的订单查看后再操作", "error");
+          this.notify("We couldn't confirm the result yet. Check My orders before trying again.", "error");
         } else {
           this.showError(error);
         }
@@ -668,7 +669,7 @@ app = new Vue({
         ? this.user
         : (await api("/user/" + query.get("id"))).data;
       if (!this.profileUser) {
-        throw new Error("这位用户暂时没有公开资料");
+        throw new Error("This user has no public profile yet.");
       }
       if (this.isOwnProfile) {
         this.signCount = Number((await api("/user/sign/count")).data || 0);
@@ -684,7 +685,7 @@ app = new Vue({
         await api("/user/sign", { method: "POST" });
         this.signCount = Number((await api("/user/sign/count")).data || 0);
         this.signed = true;
-        this.notify("签到成功，今天也要好好生活");
+        this.notify("Checked in. See you tomorrow!");
       } catch (error) {
         this.showError(error);
       } finally {
@@ -738,26 +739,26 @@ app = new Vue({
         this.pendingRequest = (await api("/voucher-order/requests/" + id)).data;
         const state = this.pendingRequest && this.pendingRequest.state;
         if (state === "SUCCESS") {
-          this.requestMessage = "领取已确认，请查看下面的订单";
+          this.requestMessage = "Confirmed! Your order is below.";
           await this.loadOrders();
           return;
         }
         if (state === "FAILED") {
-          this.requestMessage = "本次领取未成功，请返回店铺查看";
+          this.requestMessage = "This reservation didn't go through. Head back to the shop to check availability.";
           return;
         }
         if (state === "REVIEW") {
-          this.requestMessage = "领取结果仍在核对，请稍后重新查看";
+          this.requestMessage = "We're still verifying this reservation. Check back shortly.";
           return;
         }
-        this.requestMessage = "领取请求已受理，正在确认结果…";
+        this.requestMessage = "Request received. Confirming your reservation…";
         if (attempt < 10) {
           this.requestTimer = setTimeout(
             () => this.watchRequest(attempt + 1),
             2000,
           );
         } else {
-          this.requestMessage = "订单仍在处理中，可稍后刷新查看，请勿重复提交";
+          this.requestMessage = "Your order is still processing. Refresh later and please don't submit again.";
         }
       } catch (error) {
         this.requestMessage = error.message;
@@ -774,7 +775,7 @@ app = new Vue({
           method: "POST",
         });
         await this.loadOrders();
-        this.notify("订单已取消");
+        this.notify("Order cancelled.");
       } catch (error) {
         this.showError(error);
       }
@@ -782,7 +783,7 @@ app = new Vue({
     async sendCode() {
       this.loginError = "";
       if (!EMAIL_PATTERN.test(this.email.trim())) {
-        this.loginError = "请输入正确的邮箱地址";
+        this.loginError = "Please enter a valid email address.";
         return;
       }
       if (this.codeBusy || this.codeCountdown) {
@@ -801,7 +802,7 @@ app = new Vue({
             clearInterval(this.codeTimer);
           }
         }, 1000);
-        this.notify("验证码已发送到邮箱，本地环境可在 Mailpit（127.0.0.1:8025）查看");
+        this.notify("Code sent! Check your inbox. In local dev, open Mailpit at http://127.0.0.1:8025.");
       } catch (error) {
         this.loginError = error.message;
       } finally {
@@ -813,7 +814,7 @@ app = new Vue({
         !EMAIL_PATTERN.test(this.email.trim()) ||
         !/^\d{6}$/.test(this.code.trim())
       ) {
-        this.loginError = "请填写正确的邮箱和 6 位验证码";
+        this.loginError = "Enter a valid email and the 6-digit code.";
         return;
       }
       this.loginBusy = true;
@@ -856,7 +857,7 @@ app = new Vue({
     async upload(event) {
       const files = Array.from(event.target.files || []);
       if (files.length + this.draft.pictures.length > 9) {
-        this.notify("最多上传 9 张图片", "error");
+        this.notify("You can upload up to 9 photos.", "error");
         event.target.value = "";
         return;
       }
@@ -866,7 +867,7 @@ app = new Vue({
             file.size > 5000000 || !/\.(jpg|jpeg|png|webp)$/i.test(file.name),
         )
       ) {
-        this.notify("请选择 5 MB 以内的 JPG、PNG 或 WebP 图片", "error");
+        this.notify("Choose JPG, PNG or WebP images up to 5 MB each.", "error");
         event.target.value = "";
         return;
       }
@@ -901,7 +902,7 @@ app = new Vue({
         !this.draft.content.trim() ||
         !this.draft.shopId
       ) {
-        this.notify("请填写标题、探店内容并选择关联店铺", "error");
+        this.notify("Add a title, your review and the shop it's about.", "error");
         return;
       }
       if (this.publishBusy || this.uploadBusy) {

@@ -26,34 +26,34 @@ class RedissonTest extends IntegrationTestBase {
 
   @Test
   void method1() throws InterruptedException {
-    // 尝试获取锁
+    // Try to acquire the lock
     boolean isLock = lock.tryLock(1L, TimeUnit.SECONDS);
     if (!isLock) {
-      log.error("获取锁失败 .... 1");
+      log.error("Failed to acquire lock .... 1");
       return;
     }
     try {
-      log.info("获取锁成功 .... 1");
+      log.info("Acquired lock .... 1");
       method2();
-      log.info("开始执行业务 ... 1");
+      log.info("Running business logic ... 1");
     } finally {
-      log.warn("准备释放锁 .... 1");
+      log.warn("Releasing lock .... 1");
       lock.unlock();
     }
   }
 
   void method2() {
-    // 尝试获取锁
+    // Try to acquire the lock
     boolean isLock = lock.tryLock();
     if (!isLock) {
-      log.error("获取锁失败 .... 2");
+      log.error("Failed to acquire lock .... 2");
       return;
     }
     try {
-      log.info("获取锁成功 .... 2");
-      log.info("开始执行业务 ... 2");
+      log.info("Acquired lock .... 2");
+      log.info("Running business logic ... 2");
     } finally {
-      log.warn("准备释放锁 .... 2");
+      log.warn("Releasing lock .... 2");
       lock.unlock();
     }
   }

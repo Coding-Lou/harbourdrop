@@ -7,12 +7,6 @@ import com.hmdp.service.IUserInfoService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
-/**
- * 服务实现类
- *
- * @author 虎哥
- * @since 2021-12-24
- */
 @Service
 public class UserInfoServiceImpl implements IUserInfoService {
   @Resource

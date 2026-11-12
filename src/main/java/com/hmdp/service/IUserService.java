@@ -8,9 +8,8 @@ import java.util.List;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 /**
- * 服务类
+ * User service.
  *
- * @author 虎哥
  * @since 2021-12-22
  */
 public interface IUserService {

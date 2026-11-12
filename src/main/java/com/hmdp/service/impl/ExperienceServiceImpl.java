@@ -81,17 +81,18 @@ public class ExperienceServiceImpl implements IExperienceService {
   }
 
   /**
-   * 在同一个请求缓存作用域中读取同一店铺两次，记录每次经过的缓存层与耗时。
+   * Reads the same shop twice within one request cache scope, recording the cache layers each read
+   * passed through and its duration.
    *
-   * <p>用于观察请求级复用；不会主动清空缓存制造命中结果。
+   * <p>Used to observe request-level reuse; it never clears caches to fabricate a hit.
    */
   @Override
   public Result traceShopCacheReads(Long shopId) {
     if (!enabled) {
-      return Result.fail("体验观察接口未启用");
+      return Result.fail("Demo inspection is disabled.");
     }
     if (shopId == null || shopId <= 0) {
-      return Result.fail("请选择有效店铺");
+      return Result.fail("Please choose a valid shop.");
     }
     List<Map<String, Object>> reads = new ArrayList<>();
     String shopName = null;
@@ -121,17 +122,19 @@ public class ExperienceServiceImpl implements IExperienceService {
   }
 
   /**
-   * 提交三条体验访问事件并返回事件号，浏览器可继续轮询各事件的落库结果。
+   * Submits three demo visit events and returns their event IDs so the browser can poll each
+   * event's persisted result.
    *
-   * <p>submitted 是提交采集的数量，不是 Kafka 确认数或成功写入数据库的数量。
+   * <p>submitted is the number of events handed to collection, not the number Kafka acknowledged or
+   * the database stored.
    */
   @Override
   public Result submitDemoVisitEvents(Long shopId) {
     if (!enabled || !analyticsEnabled) {
-      return Result.fail("Kafka 访问体验未启用");
+      return Result.fail("Kafka visit demo is disabled.");
     }
     if (shopId == null || shopId <= 0) {
-      return Result.fail("请选择有效店铺");
+      return Result.fail("Please choose a valid shop.");
     }
     Result shop = shopService.queryById(shopId);
     if (!Boolean.TRUE.equals(shop.getSuccess())) {
@@ -142,7 +145,7 @@ public class ExperienceServiceImpl implements IExperienceService {
     for (int index = 0; index < 3; index++) {
       String id = behaviorJournalService.submitShopVisitEvent(shopId, userId);
       if (id == null) {
-        return Result.fail("访问采集未启用");
+        return Result.fail("Visit collection is disabled.");
       }
       eventIds.add(id);
     }
@@ -156,14 +159,14 @@ public class ExperienceServiceImpl implements IExperienceService {
   @Override
   public Result queryVisitEventReceipts(List<String> eventIds) {
     if (!enabled || !analyticsEnabled) {
-      return Result.fail("Kafka 访问体验未启用");
+      return Result.fail("Kafka visit demo is disabled.");
     }
     if (eventIds == null || eventIds.isEmpty() || eventIds.size() > 3) {
-      return Result.fail("一次仅查询 1～3 个体验事件");
+      return Result.fail("Query 1 to 3 demo events at a time.");
     }
     for (String id : eventIds) {
       if (id == null || !id.matches("[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}")) {
-        return Result.fail("体验事件号格式无效");
+        return Result.fail("Invalid demo event ID format.");
       }
     }
     List<Map<String, Object>> receipts = new ArrayList<>();
@@ -183,10 +186,10 @@ public class ExperienceServiceImpl implements IExperienceService {
   @Override
   public Result queryMyOrderProgress(Long orderId) {
     if (!enabled) {
-      return Result.fail("体验观察接口未启用");
+      return Result.fail("Demo inspection is disabled.");
     }
     if (orderId == null || orderId <= 0 || UserHolder.getUser() == null) {
-      return Result.fail("请登录后查询自己的订单");
+      return Result.fail("Log in to view your orders.");
     }
     Result owned = voucherOrderService.queryMyOrder(orderId);
     if (!Boolean.TRUE.equals(owned.getSuccess())) {

@@ -56,8 +56,8 @@
 }
 .filter-panel button:hover,
 .filter-panel button.active {
-  color: var(--orange-dark);
-  background: var(--peach);
+  color: var(--primary-dark);
+  background: var(--tint);
 }
 .filter-sort > a {
   margin-left: auto;
@@ -121,7 +121,7 @@
   font-size: 12px;
 }
 .shop-score strong {
-  color: var(--orange-dark);
+  color: var(--primary-dark);
 }
 .shop-score .muted {
   margin-left: auto;
@@ -160,7 +160,7 @@
   margin: 0 0 24px;
 }
 .breadcrumbs a:hover {
-  color: var(--orange);
+  color: var(--primary);
 }
 .breadcrumbs > span {
   max-width: 500px;
@@ -188,7 +188,7 @@
   font-size: 13px;
 }
 .detail-rating > strong {
-  color: var(--orange-dark);
+  color: var(--primary-dark);
   font-size: 18px;
 }
 .detail-rating b {
@@ -274,10 +274,10 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  border: 1px solid #ffe0cb;
+  border: 1px solid #cfe5e1;
   border-radius: 14px;
   padding: 21px;
-  background: #fff9f3;
+  background: #f7fbfa;
   margin-bottom: 15px;
 }
 .ticket-mark {
@@ -288,8 +288,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--orange);
-  background: #ffecd9;
+  color: var(--primary);
+  background: var(--tint);
 }
 .ticket-mark i {
   font-size: 29px;
@@ -308,14 +308,14 @@
 }
 .voucher-main p {
   font-size: 11px;
-  color: #a1907e;
+  color: #5f6f6c;
   margin: 5px 0 9px;
 }
 .voucher-price {
   display: flex;
   gap: 4px;
   align-items: baseline;
-  color: var(--orange-dark);
+  color: var(--accent-dark);
   font-size: 14px;
   flex-wrap: wrap;
 }
@@ -325,14 +325,53 @@
 }
 .voucher-price > span {
   margin-left: 9px;
-  color: #a1907e;
+  color: #5f6f6c;
   font-size: 10px;
 }
 .voucher-price .tag {
   padding: 2px 5px;
-  background: #ffe8d7;
+  background: var(--accent);
   border-radius: 4px;
-  color: #b07143;
+  color: var(--ink);
+}
+.voucher-price .tag.sale-upcoming {
+  background: var(--tint);
+  color: var(--primary-dark);
+}
+.voucher-price .tag.sale-sold-out,
+.voucher-price .tag.sale-ended {
+  background: #e7ecea;
+  color: var(--muted);
+}
+.voucher-kind {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary-dark);
+  margin-bottom: 2px;
+}
+.drop-card .voucher-kind {
+  color: var(--accent-dark);
+}
+.ticket-mark .bag-mark {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.drop-card .ticket-mark {
+  background: var(--accent-tint);
+}
+.voucher-main .voucher-pickup,
+.order-info .order-pickup {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 8px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-dark);
 }
 .voucher-card .button {
   border-radius: 24px;
@@ -346,7 +385,7 @@
 }
 .intro-icon {
   font-size: 66px;
-  color: #ffc7a5;
+  color: #9fd0ca;
   margin-right: 25px;
 }
 .note-layout {
@@ -383,7 +422,7 @@
   background: transparent;
 }
 .note-thumbnails button.active {
-  border-color: var(--orange);
+  border-color: var(--primary);
 }
 .note-thumbnails img {
   height: 100%;
@@ -441,7 +480,7 @@
 }
 .note-shop > i:first-child {
   font-size: 24px;
-  color: var(--orange);
+  color: var(--primary);
 }
 .note-shop > div {
   flex: 1;
@@ -483,7 +522,7 @@
 .login-visual {
   position: relative;
   overflow: hidden;
-  background: #f2ebda;
+  background: #dcebe8;
 }
 .login-visual img {
   position: absolute;
@@ -497,8 +536,8 @@
   inset: 0;
   background: linear-gradient(
     0deg,
-    rgb(30 44 26 / 85%),
-    rgb(30 44 26 / 7%) 90%
+    rgb(18 49 46 / 85%),
+    rgb(18 49 46 / 7%) 90%
   );
 }
 .login-visual > div {
@@ -510,7 +549,7 @@
   color: white;
 }
 .login-visual .eyebrow {
-  color: #e8ddc6;
+  color: #f7c79c;
 }
 .login-visual h1 {
   font-size: 36px;
@@ -519,7 +558,7 @@
   letter-spacing: -0.03em;
 }
 .login-visual p {
-  color: #dddcc9;
+  color: #d6e6e3;
   font-size: 13px;
   line-height: 1.9;
 }
@@ -554,7 +593,7 @@
 }
 .input-with-prefix:focus-within,
 .code-input:focus-within {
-  border-color: #ffad8a;
+  border-color: #9fd0ca;
   background: white;
 }
 .input-with-prefix > span {
@@ -650,7 +689,7 @@
 }
 .profile-navigation > a > i:first-child {
   font-size: 29px;
-  color: var(--orange);
+  color: var(--primary);
 }
 .profile-navigation h3 {
   font-size: 16px;
@@ -682,11 +721,11 @@
   gap: 22px;
 }
 .request-banner {
-  background: var(--peach);
+  background: var(--tint);
   padding: 15px 20px;
-  border: 1px solid #ffe1ce;
+  border: 1px solid var(--tint-strong);
   border-radius: 10px;
-  color: #b2734c;
+  color: var(--primary-dark);
   display: flex;
   gap: 10px;
   align-items: center;
@@ -716,8 +755,8 @@
   padding: 27px;
 }
 .order-ticket {
-  background: var(--peach);
-  color: var(--orange);
+  background: var(--tint);
+  color: var(--primary);
   border-radius: 12px;
   width: 72px;
   height: 72px;
@@ -738,7 +777,7 @@
 }
 .order-price {
   font-size: 22px;
-  color: #555748;
+  color: var(--ink);
 }
 .order-state {
   font-size: 12px;
@@ -748,8 +787,8 @@
   border-radius: 6px;
 }
 .order-state.state-1 {
-  color: #ca7838;
-  background: #fff1df;
+  color: #9a5214;
+  background: var(--accent-tint);
 }
 .order-state.state-2 {
   color: #628260;
@@ -806,7 +845,7 @@
 .publish-form textarea:focus,
 .publish-form select:focus {
   background: white;
-  border-color: #ffad8a;
+  border-color: #9fd0ca;
 }
 .field-label {
   display: flex;
@@ -870,7 +909,7 @@
   height: 1px;
 }
 .upload-box:focus-within {
-  outline: 2px solid var(--orange);
+  outline: 2px solid var(--primary);
   outline-offset: 3px;
 }
 .upload-help {

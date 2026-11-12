@@ -102,7 +102,7 @@ class ExperienceServiceTest {
     UserDTO user = new UserDTO();
     user.setId(7L);
     UserHolder.saveUser(user);
-    when(orders.queryMyOrder(10L)).thenReturn(Result.fail("订单不存在"));
+    when(orders.queryMyOrder(10L)).thenReturn(Result.fail("Order not found."));
     assertFalse(service.queryMyOrderProgress(10L).getSuccess());
     verifyNoInteractions(messages);
   }

@@ -46,12 +46,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-/**
- * 服务实现类
- *
- * @author 虎哥
- * @since 2021-12-22
- */
 @Service
 public class ShopServiceImpl implements IShopService {
   private static final double EARTH_RADIUS_METERS = 6371000.0;
@@ -73,17 +67,17 @@ public class ShopServiceImpl implements IShopService {
 
   @Override
   public Result queryById(Long id) {
-    // 解决缓存穿透
+    // Guard against cache penetration
     Shop shop =
         cacheClient.queryWithPassThrough(
             CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
 
-    // 互斥锁解决缓存击穿
+    // Mutex lock against cache breakdown
     // Shop shop = cacheClient
     //         .queryWithMutex(CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL,
     // TimeUnit.MINUTES);
 
-    // 逻辑过期解决缓存击穿
+    // Logical expiry against cache breakdown
     // Shop shop = cacheClient
     //         .queryWithLogicalExpire(CACHE_SHOP_KEY, id, Shop.class, this::getById, 20L,
     // TimeUnit.SECONDS);
@@ -97,9 +91,9 @@ public class ShopServiceImpl implements IShopService {
               CACHE_SHOP_KEY, id, Shop.class, this::getById, CACHE_SHOP_TTL, TimeUnit.MINUTES);
     }
     if (shop == null) {
-      return Result.fail("店铺不存在！");
+      return Result.fail("Shop not found.");
     }
-    // 7.返回
+    // 7. Return
     return Result.ok(shop);
   }
 
@@ -126,11 +120,11 @@ public class ShopServiceImpl implements IShopService {
   public Result update(Shop shop) {
     Long id = shop.getId();
     if (id == null) {
-      return Result.fail("店铺id不能为空");
+      return Result.fail("Shop ID is required.");
     }
-    // 1.更新数据库
+    // 1. Update the database
     if (!shopRepository.updateById(shop)) {
-      return Result.fail("店铺不存在或未修改");
+      return Result.fail("Shop not found or unchanged.");
     }
     // Durable invalidation event commits with the update; immediate deletion runs after commit.
     outbox.appendShopCacheInvalidation(id);
@@ -139,22 +133,22 @@ public class ShopServiceImpl implements IShopService {
 
   @Override
   public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
-    // 1.判断是否需要根据坐标查询
+    // 1. Check whether a coordinate query is needed
     if (x == null || y == null) {
-      // 不需要坐标查询，按数据库查询
+      // No coordinate query needed; query the database
       Page<Shop> page =
           shopRepository.findAll(
               (shop, query, cb) -> cb.equal(shop.get("typeId"), typeId.longValue()),
               pageOf(current, SystemConstants.DEFAULT_PAGE_SIZE));
-      // 返回数据
+      // Return the data
       return Result.ok(page.getContent());
     }
 
-    // 2.计算分页参数
+    // 2. Compute paging parameters
     int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
     int end = current * SystemConstants.DEFAULT_PAGE_SIZE;
 
-    // 3.查询redis、按照距离排序、分页。结果：shopId、distance
+    // 3. Query Redis, sort by distance and paginate. Result: shopId, distance
     String key = SHOP_GEO_KEY + typeId;
     // A fresh Redis has no course GEO fixtures; the default page must still show nearby shops.
     if (!Boolean.TRUE.equals(stringRedisTemplate.hasKey(key))) {
@@ -178,30 +172,30 @@ public class ShopServiceImpl implements IShopService {
                     .includeDistance()
                     .sortAscending()
                     .limit(end));
-    // 4.解析出id
+    // 4. Extract the IDs
     if (results == null) {
       return Result.ok(Collections.emptyList());
     }
     List<GeoResult<RedisGeoCommands.GeoLocation<String>>> list = results.getContent();
     if (list.size() <= from) {
-      // 没有下一页了，结束
+      // No next page; stop
       return Result.ok(Collections.emptyList());
     }
-    // 4.1.截取 from ~ end的部分
+    // 4.1. Take the from ~ end slice
     List<Long> ids = new ArrayList<>(list.size());
     Map<String, Distance> distanceMap = new HashMap<>(list.size());
     list.stream()
         .skip(from)
         .forEach(
             result -> {
-              // 4.2.获取店铺id
+              // 4.2. Get the shop ID
               String shopIdStr = result.getContent().getName();
               ids.add(Long.valueOf(shopIdStr));
-              // 4.3.获取距离
+              // 4.3. Get the distance
               Distance distance = result.getDistance();
               distanceMap.put(shopIdStr, distance);
             });
-    // 5.根据id查询Shop，并保持 GEO 返回的距离顺序
+    // 5. Query shops by ID, preserving the distance order returned by GEO
     Map<Long, Shop> byId = new HashMap<>();
     for (Shop shop : listByIds(ids)) {
       byId.put(shop.getId(), shop);
@@ -214,31 +208,31 @@ public class ShopServiceImpl implements IShopService {
         shops.add(shop);
       }
     }
-    // 6.返回
+    // 6. Return
     return Result.ok(shops);
   }
 
   @Override
   public Result searchShops(ShopSearchDTO criteria) {
     if (criteria.getTypeId() == null || criteria.getTypeId() <= 0) {
-      return Result.fail("typeId 必须是正整数");
+      return Result.fail("typeId must be a positive integer.");
     }
     Integer page = criteria.getPage();
     Integer size = criteria.getSize();
     if (page == null || page < 1 || page > 100000 || size == null || size < 1 || size > 20) {
-      return Result.fail("page 必须为 1~100000，size 必须为 1~20");
+      return Result.fail("page must be 1-100000 and size must be 1-20.");
     }
     if (criteria.getMaxPrice() != null && criteria.getMaxPrice() < 0) {
-      return Result.fail("maxPrice 不能为负数");
+      return Result.fail("maxPrice can't be negative.");
     }
     if (criteria.getMinScore() != null
         && (criteria.getMinScore() < 0 || criteria.getMinScore() > 50)) {
-      return Result.fail("minScore 必须为 0~50");
+      return Result.fail("minScore must be 0-50.");
     }
     Double x = criteria.getX();
     Double y = criteria.getY();
     if ((x == null) != (y == null)) {
-      return Result.fail("x 和 y 必须一起提供");
+      return Result.fail("x and y must be provided together.");
     }
     if (x != null
         && (!Double.isFinite(x)
@@ -247,14 +241,14 @@ public class ShopServiceImpl implements IShopService {
             || x > 180
             || y < -90
             || y > 90)) {
-      return Result.fail("坐标超出范围");
+      return Result.fail("Coordinates are out of range.");
     }
     String sort = StringUtils.hasText(criteria.getSort()) ? criteria.getSort() : "score";
     if (!"score".equals(sort) && !"price".equals(sort) && !"distance".equals(sort)) {
-      return Result.fail("sort 只支持 score、price、distance");
+      return Result.fail("sort must be score, price or distance.");
     }
     if ("distance".equals(sort) && x == null) {
-      return Result.fail("按距离排序需要 x 和 y");
+      return Result.fail("Sorting by distance requires x and y.");
     }
 
     Long typeId = criteria.getTypeId();
@@ -289,7 +283,8 @@ public class ShopServiceImpl implements IShopService {
           }
           List<Order> orders = new ArrayList<>();
           if (x != null) {
-            // 先用经纬度范围缩小候选集，再用球面距离精确筛选 5 公里范围；排序与分页都在 MySQL 中完成。
+            // Narrow candidates with a lat/lon bounding box, then filter to 5 km by great-circle
+            // distance; sorting and paging both happen in MySQL.
             final double radiusMeters = 5000.0;
             double latDelta = radiusMeters / 111320.0;
             double lonDelta =
@@ -402,7 +397,7 @@ public class ShopServiceImpl implements IShopService {
         || keyword.length() > 50
         || (typeId != null && typeId <= 0)
         || !("score".equals(sort) || "price".equals(sort))) {
-      return Result.fail("店铺查询参数无效");
+      return Result.fail("Invalid shop query parameters.");
     }
     String name = StringUtils.hasText(keyword) ? keyword.trim() : null;
     Specification<Shop> spec =
@@ -429,7 +424,7 @@ public class ShopServiceImpl implements IShopService {
         || ids.isEmpty()
         || ids.size() > 40
         || ids.stream().anyMatch(id -> id == null || id <= 0)) {
-      return Result.fail("ids 必须包含 1~40 个正整数");
+      return Result.fail("ids must contain 1-40 positive integers.");
     }
     List<Long> uniqueIds = ids.stream().distinct().collect(Collectors.toList());
     return Result.ok(listByIds(uniqueIds));
@@ -444,21 +439,21 @@ public class ShopServiceImpl implements IShopService {
 
   @Override
   public Result saveShop(Shop shop) {
-    // 写入数据库
+    // Write to the database
     shopRepository.insert(shop);
-    // 返回店铺id
+    // Return the shop ID
     return Result.ok(shop.getId());
   }
 
   @Override
   public Result queryShopByName(String name, Integer current) {
-    // 根据类型分页查询
+    // Page through shops by type
     Specification<Shop> byName =
         (shop, query, cb) ->
             StringUtils.hasText(name) ? cb.like(shop.get("name"), "%" + name + "%") : null;
     Page<Shop> page =
         shopRepository.findAll(byName, pageOf(current, SystemConstants.MAX_PAGE_SIZE));
-    // 返回数据
+    // Return the data
     return Result.ok(page.getContent());
   }
 

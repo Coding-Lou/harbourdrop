@@ -33,15 +33,17 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
   }
 
   /**
-   * 在订单创建事务内初始化截止时间，并登记创建事件及延迟关单事件。
+   * Initializes the deadline within the order-creation transaction and records the creation event
+   * and the delayed close event.
    *
-   * <p>登记成功不代表已发送消息；Relay 会在业务提交后投递，回滚时事件也一起回滚。
+   * <p>Recording them does not mean the messages were sent; the relay delivers them after the
+   * business commit, and on rollback the events roll back too.
    */
   @Override
   public void registerOrderCreatedEventAndDeadline(long orderId) {
     requireTransaction();
     if (timeoutMinutes < 1 || timeoutMinutes > 1440) {
-      throw new IllegalStateException("普通订单超时必须在 1～1440 分钟之间");
+      throw new IllegalStateException("Regular order timeout must be between 1 and 1440 minutes");
     }
     voucherOrderRepository.initializeDeadline(timeoutMinutes, orderId);
     Map<String, Object> row = voucherOrderRepository.selectDeadline(orderId);
@@ -65,9 +67,11 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
   }
 
   /**
-   * 锁定订单并重新校验当前状态、类型和截止时间，再条件关闭普通券订单。
+   * Locks the order, re-checks its current status, type and deadline, then conditionally closes the
+   * regular-voucher order.
    *
-   * <p>提前到达的消息只重新登记截止事件；支付或关闭已经完成时不再产生重复关闭事件。
+   * <p>A message that arrives early only re-records the deadline event; once payment or closing has
+   * completed, no duplicate close event is produced.
    */
   @Override
   public boolean closeExpiredOrdinaryOrder(long orderId) {
@@ -87,7 +91,7 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
                 return false;
               }
               if (row.get("expire_at") == null) {
-                throw new IllegalStateException("普通订单缺少截止时间");
+                throw new IllegalStateException("Regular order is missing a deadline");
               }
               long userId = ((Number) row.get("user_id")).longValue();
               if (((Number) row.get("due")).intValue() == 0) {
@@ -105,7 +109,7 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
 
   private static void requireTransaction() {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("订单状态与事件必须同事务提交");
+      throw new IllegalStateException("Order status and events must commit in one transaction");
     }
   }
 

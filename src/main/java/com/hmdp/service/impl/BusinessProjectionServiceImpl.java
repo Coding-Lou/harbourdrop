@@ -29,7 +29,10 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
-/** 按业务类型分发投影；各步骤读取当前事实，支持消息重放。 */
+/**
+ * Dispatches projections by business type; each step reads current facts, so messages can be
+ * replayed.
+ */
 @Service
 public class BusinessProjectionServiceImpl implements IBusinessProjectionService {
   private static final int FEED_BATCH_SIZE = 200;
@@ -91,7 +94,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
                 + ":"
                 + task.getAggregateId());
     if (!lock.tryLock()) {
-      throw new IllegalStateException("关系投影正在处理，稍后重试");
+      throw new IllegalStateException("Relationship projection in progress; retry later");
     }
     try {
       return apply(task, type);
@@ -134,7 +137,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
         projectLike(task.getUserId(), task.getAggregateId());
         break;
       default:
-        throw new IllegalArgumentException("未知 Outbox 类型");
+        throw new IllegalArgumentException("Unknown outbox kind");
     }
     return ProjectionResult.COMPLETE;
   }
@@ -154,9 +157,10 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
       return;
     }
     if (!"DELETING".equals(states.get(0))) {
-      throw new IllegalStateException("图片未申请删除，拒绝删除文件");
+      throw new IllegalStateException("Image deletion not requested; refusing to delete the file");
     }
-    // 文件不参与 MySQL 事务；重复删除必须安全，随后登记持久完成状态。
+    // Files are outside the MySQL transaction; repeated deletes must be safe, then completion is
+    // recorded durably.
     mediaStorage.delete(path);
     mediaRepository.markDeleted(path);
   }
@@ -171,7 +175,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   private void enqueueSeckillRetry(long orderId) {
     SeckillReservation reservation = seckillReservationRepository.selectReservation(orderId);
     if (reservation == null) {
-      throw new IllegalStateException("抢购请求不存在");
+      throw new IllegalStateException("Seckill request not found");
     }
     if (!ReservationState.PROCESSING.matches(reservation.getState())) {
       return;
@@ -202,7 +206,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   }
 
   private void projectFollow(long userId, long followedUserId) {
-    // 读取当前关系，迟到的旧事件不能把已取消的关注恢复回来。
+    // Read the current relationship so a late, stale event cannot restore a cancelled follow.
     String followKey = "follows:" + userId;
     if (followRepository.countEdge(userId, followedUserId) > 0) {
       redis.opsForSet().add(followKey, String.valueOf(followedUserId));

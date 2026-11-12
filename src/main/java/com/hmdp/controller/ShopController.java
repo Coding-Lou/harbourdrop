@@ -16,9 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 前端控制器
- *
- * @author 虎哥
+ * REST controller for shops.
  */
 @RestController
 @RequestMapping("/shop")
@@ -28,23 +26,23 @@ public class ShopController {
   private IShopService shopService;
 
   /**
-   * 根据id查询商铺信息
+   * Looks up a shop by ID.
    *
-   * @param id 商铺id
-   * @return 商铺详情数据
+   * @param id shop ID
+   * @return shop details
    */
   @GetMapping("/{id}")
   public Result queryShopById(@PathVariable("id") Long id) {
     return shopService.queryShopDetail(id);
   }
 
-  /** 供 CityLens 使用的只读组合搜索，评分参数按数据库的 10 倍整数传入。 */
+  /** Read-only combined search for CityLens; rating parameters use the database's 10x scale. */
   @GetMapping("/search")
   public Result searchShops(ShopSearchDTO criteria) {
     return shopService.searchShops(criteria);
   }
 
-  /** 统一前端的跨分类店铺列表；Agent 的严格搜索接口保持原有条件。 */
+  /** Cross-category shop list for the unified frontend; the agent's strict search is unchanged. */
   @GetMapping("/catalog")
   public Result catalog(
       @RequestParam(value = "keyword", defaultValue = "") String keyword,
@@ -55,23 +53,23 @@ public class ShopController {
     return shopService.catalog(keyword, typeId, page, size, sort);
   }
 
-  /** CityLens 在组合两站前批量复核候选，直接读取当前店铺数据。 */
+  /** Lets CityLens re-check candidates in bulk before pairing two stops; reads live shop data. */
   @GetMapping("/batch")
   public Result queryShopsByIds(@RequestParam("ids") List<Long> ids) {
     return shopService.queryShopsByIds(ids);
   }
 
-  /** 供 CityLens 在用户原话中匹配真实商圈，避免猜测地名。 */
+  /** Lets CityLens match real neighbourhoods from the user's own words instead of guessing. */
   @GetMapping("/areas")
   public Result listAreas() {
     return shopService.listAreas();
   }
 
   /**
-   * 新增商铺信息
+   * Creates a shop.
    *
-   * @param shop 商铺数据
-   * @return 商铺id
+   * @param shop shop data
+   * @return shop ID
    */
   @PostMapping
   public Result saveShop(@RequestBody Shop shop) {
@@ -79,23 +77,22 @@ public class ShopController {
   }
 
   /**
-   * 更新商铺信息
+   * Updates a shop.
    *
-   * @param shop 商铺数据
-   * @return 无
+   * @param shop shop data
    */
   @PutMapping
   public Result updateShop(@RequestBody Shop shop) {
-    // 写入数据库
+    // Write to the database
     return shopService.update(shop);
   }
 
   /**
-   * 根据商铺类型分页查询商铺信息
+   * Pages shops of a given type.
    *
-   * @param typeId 商铺类型
-   * @param current 页码
-   * @return 商铺列表
+   * @param typeId shop type
+   * @param current page number
+   * @return shops
    */
   @GetMapping("/of/type")
   public Result queryShopByType(
@@ -107,11 +104,11 @@ public class ShopController {
   }
 
   /**
-   * 根据商铺名称关键字分页查询商铺信息
+   * Pages shops whose name matches a keyword.
    *
-   * @param name 商铺名称关键字
-   * @param current 页码
-   * @return 商铺列表
+   * @param name shop name keyword
+   * @param current page number
+   * @return shops
    */
   @GetMapping("/of/name")
   public Result queryShopByName(

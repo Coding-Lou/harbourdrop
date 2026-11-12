@@ -29,9 +29,9 @@ public class SimpleRedisLock implements ILock {
 
   @Override
   public boolean tryLock(long timeoutSec) {
-    // 获取线程标示
+    // Get the thread identifier
     String threadId = ID_PREFIX + Thread.currentThread().getId();
-    // 获取锁
+    // Acquire the lock
     Boolean success =
         stringRedisTemplate
             .opsForValue()
@@ -41,7 +41,7 @@ public class SimpleRedisLock implements ILock {
 
   @Override
   public void unlock() {
-    // 调用lua脚本
+    // Call the Lua script
     stringRedisTemplate.execute(
         UNLOCK_SCRIPT,
         Collections.singletonList(KEY_PREFIX + name),
@@ -49,13 +49,13 @@ public class SimpleRedisLock implements ILock {
   }
   /*@Override
   public void unlock() {
-      // 获取线程标示
+      // Get the thread identifier
       String threadId = ID_PREFIX + Thread.currentThread().getId();
-      // 获取锁中的标示
+      // Get the identifier stored in the lock
       String id = stringRedisTemplate.opsForValue().get(KEY_PREFIX + name);
-      // 判断标示是否一致
+      // Check whether the identifiers match
       if(threadId.equals(id)) {
-          // 释放锁
+          // Release the lock
           stringRedisTemplate.delete(KEY_PREFIX + name);
       }
   }*/

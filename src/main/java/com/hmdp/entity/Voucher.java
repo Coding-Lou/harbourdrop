@@ -15,7 +15,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * @author 虎哥
+ * A voucher: an ordinary deal or a flash-sale drop.
+ *
  * @since 2021-12-22
  */
 @Data
@@ -29,50 +30,59 @@ public class Voucher implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 主键 */
+  /** Primary key */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** 商铺id */
+  /** Shop ID */
   private Long shopId;
 
-  /** 代金券标题 */
+  /** Voucher title */
   private String title;
 
-  /** 副标题 */
+  /** Subtitle */
   private String subTitle;
 
-  /** 使用规则 */
+  /** Usage rules */
   private String rules;
 
-  /** 支付金额 */
+  /** Amount paid */
   private Long payValue;
 
-  /** 抵扣金额 */
+  /** Amount deducted (face value) */
   private Long actualValue;
 
-  /** 优惠券类型 */
+  /** Voucher type */
   private Integer type;
 
-  /** 优惠券类型 */
+  /** Voucher status */
   private Integer status;
 
-  /** 库存 */
+  /** Stock */
   @Transient private Integer stock;
 
-  /** 生效时间 */
+  /** Sale opens at (drops only) */
   @Transient private LocalDateTime beginTime;
 
-  /** 失效时间 */
+  /** Sale closes at (drops only) */
   @Transient private LocalDateTime endTime;
 
-  /** 是否可下单，由点评服务按自身时钟计算；仅用于响应，不入库。 */
+  /** Pickup window opens at (drops only, optional) */
+  @Transient private LocalDateTime pickupBeginTime;
+
+  /** Pickup window closes at (drops only, optional) */
+  @Transient private LocalDateTime pickupEndTime;
+
+  /**
+   * Whether it can be ordered, computed by this service with its own clock; response only, not
+   * persisted.
+   */
   @Transient private Boolean orderable;
 
-  /** 创建时间 */
+  /** Created at */
   private LocalDateTime createTime;
 
-  /** 更新时间 */
+  /** Updated at */
   private LocalDateTime updateTime;
 }

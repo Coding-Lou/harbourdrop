@@ -31,7 +31,7 @@ test("cache summary counts observed hits and loads without inventing unvisited l
   assert.equal(readSource(samples[0].reads[0]), "MySQL");
   assert.equal(
     readSource({ events: [{ layer: "redis", result: "miss" }] }),
-    "未采样",
+    "Not sampled",
   );
 });
 

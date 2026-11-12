@@ -1,6 +1,6 @@
 package com.hmdp.service;
 
-/** 订单创建、支付和超时关闭。 */
+/** Order creation, payment, and timeout closing. */
 public interface IOrderLifecycleService {
   void registerOrderCreatedEventAndDeadline(long orderId);
 

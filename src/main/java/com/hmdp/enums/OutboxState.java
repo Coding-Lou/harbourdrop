@@ -1,6 +1,6 @@
 package com.hmdp.enums;
 
-/** 可靠任务状态；SENT 仅表示投递已确认，DONE 才表示消费完成。 */
+/** Reliable task states; SENT only means delivery was acknowledged, DONE means consumed. */
 public enum OutboxState {
   PENDING,
   SENDING,

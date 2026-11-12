@@ -64,7 +64,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
 @Service
-// 秒杀初始化会读取活动表，必须等待数据库迁移完成。
+// Seckill initialization reads the campaign table, so it must wait for database migrations.
 @DependsOn("flywayInitializer")
 public class SeckillServiceImpl implements ISeckillService {
 
@@ -165,7 +165,10 @@ public class SeckillServiceImpl implements ISeckillService {
     for (Map<String, Object> row : seckillVoucherRepository.selectPublicationStates()) {
       long id = ((Number) row.get("voucher_id")).longValue();
       if (row.get("has_published") == null) {
-        log.warn("活动 {} 缺少持久化发布基线，保持入口关闭并等待人工核对", id);
+        log.warn(
+            "Campaign {} has no persisted publish baseline; keeping entry closed pending manual"
+                + " review",
+            id);
         continue;
       }
       if ("ACTIVE".equals(redis.opsForHash().get("seckill:activity:" + id, "state"))) {
@@ -228,7 +231,7 @@ public class SeckillServiceImpl implements ISeckillService {
         if (!running) {
           break;
         }
-        log.warn("秒杀消费暂时失败，将重试", e);
+        log.warn("Seckill consumption failed temporarily; will retry", e);
         try {
           Thread.sleep(1000);
         } catch (InterruptedException interrupted) {
@@ -353,18 +356,21 @@ public class SeckillServiceImpl implements ISeckillService {
       }
       // Registration/connection errors leave the message pending, without inventing a
       // business failure.
-      log.warn("订单消息 {} 执行失败: {}", record.getId(), summarizeFailureReason(e));
+      log.warn("Order message {} failed: {}", record.getId(), summarizeFailureReason(e));
     } finally {
       metrics.timer("hmdp.seckill.consume").record(System.nanoTime() - began, TimeUnit.NANOSECONDS);
     }
   }
 
   /**
-   * 把持久预约状态同步到 Redis 展示层，再确认当前 Stream 消息。
+   * Syncs the persisted reservation status to the Redis display layer, then acknowledges the
+   * current stream message.
    *
-   * <p>ACK 表示此消息不再重试，状态可能是 SUCCESS、FAILED 或 REVIEW，并不等同于订单成功。
+   * <p>An ACK means this message will not be retried; the status may be SUCCESS, FAILED or REVIEW,
+   * so it does not mean the order succeeded.
    *
-   * <p>展示状态写入失败时不 ACK，后续投递可以按数据库的当前状态修复展示。
+   * <p>If writing the display status fails, the message is not ACKed, so a later delivery can
+   * repair the display from the database's current state.
    */
   private void syncReservationStateAndAcknowledgeMessage(
       MapRecord<String, Object, Object> record, long orderId) {
@@ -385,7 +391,10 @@ public class SeckillServiceImpl implements ISeckillService {
         });
     redis.opsForStream().acknowledge(STREAM, GROUP, record.getId());
     metrics.counter("hmdp.seckill.deliveries", "result", "invalid").increment();
-    log.warn("隔离冲突或无效消息 {}: {}", record.getId(), summarizeFailureReason(e));
+    log.warn(
+        "Quarantining conflicting or invalid message {}: {}",
+        record.getId(),
+        summarizeFailureReason(e));
   }
 
   private void saveDeadLetter(
@@ -411,16 +420,16 @@ public class SeckillServiceImpl implements ISeckillService {
   private static long parsePositiveLongField(Map<Object, Object> fields, String fieldName) {
     Object raw = fields.get(fieldName);
     if (raw == null) {
-      throw new InvalidOrderMessage("消息缺少 " + fieldName);
+      throw new InvalidOrderMessage("Message is missing " + fieldName);
     }
     try {
       long parsed = Long.parseLong(raw.toString());
       if (parsed <= 0) {
-        throw new InvalidOrderMessage("消息参数无效");
+        throw new InvalidOrderMessage("Invalid message parameter");
       }
       return parsed;
     } catch (NumberFormatException e) {
-      throw new InvalidOrderMessage("消息参数无效: " + fieldName);
+      throw new InvalidOrderMessage("Invalid message parameter: " + fieldName);
     }
   }
 
@@ -430,9 +439,10 @@ public class SeckillServiceImpl implements ISeckillService {
   }
 
   /**
-   * 在事务中登记持久履约任务，把后续投递交给 Outbox。
+   * Records a durable fulfillment task in a transaction and hands further delivery to the outbox.
    *
-   * <p>调用者必须等事务提交成功后再 ACK Stream；否则进程崩溃会丢掉尚未持久化的工作。
+   * <p>Callers must ACK the stream only after the transaction commits; otherwise a crash would lose
+   * work that is not yet persisted.
    */
   private void enqueueFulfillmentTask(VoucherOrder order) {
     transactions.execute(
@@ -447,22 +457,24 @@ public class SeckillServiceImpl implements ISeckillService {
   }
 
   /**
-   * 按持久抢购资格处理履约事件，重复的终态事件不再次扣库存。
+   * Processes a fulfillment event against the persisted purchase admission; a repeated terminal
+   * event does not deduct stock again.
    *
-   * <p>Redis 展示更新放在事务提交之后；展示故障不能把已经落库的订单回滚或改成失败。
+   * <p>Redis display updates run after the transaction commits; a display failure must not roll
+   * back a persisted order or mark it failed.
    */
   @Override
   public void fulfillReservationFromMessage(long orderId) {
     SeckillReservation reservation = seckillReservationRepository.selectFulfillment(orderId);
     if (reservation == null) {
-      throw new IllegalStateException("缺少持久化抢购资格");
+      throw new IllegalStateException("Missing persisted purchase admission");
     }
     String state = reservation.getState();
     if (ReservationState.SUCCESS.matches(state) || ReservationState.FAILED.matches(state)) {
       return;
     }
     if (!ReservationState.PROCESSING.matches(state)) {
-      throw new IllegalStateException("秒杀请求等待人工核对");
+      throw new IllegalStateException("Seckill request awaits manual review");
     }
     VoucherOrder order =
         new VoucherOrder()
@@ -480,16 +492,21 @@ public class SeckillServiceImpl implements ISeckillService {
                   .opsForHash()
                   .put("seckill:request:" + orderId, "state", queryReservationState(orderId));
             } catch (RuntimeException unavailable) {
-              log.warn("请求 {} 的 Redis 展示状态待修复，数据库履约已提交", orderId);
+              log.warn(
+                  "Redis display status for request {} needs repair; database fulfillment is"
+                      + " committed",
+                  orderId);
             }
           }
         });
   }
 
   /**
-   * 登记抢购资格，并核对重复订单号的用户、券是否一致。
+   * Records the purchase admission and checks that a duplicate order ID has the same user and
+   * voucher.
    *
-   * <p>INSERT IGNORE 只避免重复写入，不能证明消息身份正确；冲突消息必须单独隔离。
+   * <p>INSERT IGNORE only prevents duplicate writes and cannot prove the message identity is
+   * correct, so conflicting messages must be quarantined separately.
    */
   private void registerAndValidateReservation(VoucherOrder order) {
     seckillReservationRepository.insertReservation(
@@ -498,36 +515,40 @@ public class SeckillServiceImpl implements ISeckillService {
     if (reservation == null
         || !reservation.getVoucherId().equals(order.getVoucherId())
         || !reservation.getUserId().equals(order.getUserId())) {
-      throw new InvalidOrderMessage("秒杀资格或订单号冲突，需核对");
+      throw new InvalidOrderMessage("Seckill admission or order ID conflict; needs review");
     }
   }
 
   /**
-   * 锁定预约行并判断是否可以继续履约，由订单事务调用。
+   * Locks the reservation row and decides whether fulfillment can continue; called by the order
+   * transaction.
    *
-   * @return true 表示仍在 PROCESSING；false 表示已经成功或失败，不应再次扣库存。 REVIEW 状态抛异常，等待人工处理；false 不是“没有取得锁”。
+   * @return true if still PROCESSING; false if it already succeeded or failed, so stock must not be
+   *     deducted again. REVIEW throws and waits for manual handling; false does not mean "lock not
+   *     acquired".
    */
   @Override
   public boolean lockReservationForFulfillment(VoucherOrder order) {
     SeckillReservation reservation =
         seckillReservationRepository.selectStateForUpdate(order.getId());
     if (reservation == null) {
-      throw new IllegalStateException("缺少持久化抢购资格");
+      throw new IllegalStateException("Missing persisted purchase admission");
     }
     String state = reservation.getState();
     if (ReservationState.FAILED.matches(state) || ReservationState.SUCCESS.matches(state)) {
       return false;
     }
     if (!ReservationState.PROCESSING.matches(state)) {
-      throw new IllegalStateException("订单等待人工核对");
+      throw new IllegalStateException("Order awaits manual review");
     }
     return true;
   }
 
   /**
-   * 登记持久履约成功，由扣库存、写订单的同一个事务调用。
+   * Records durable fulfillment success; called by the same transaction that deducts stock and
+   * writes the order.
    *
-   * <p>此方法只更新数据库；Redis 展示状态由提交后的流程同步。
+   * <p>This method only updates the database; the Redis display status is synced after commit.
    */
   @Override
   public void markReservationSuccessful(long orderId) {
@@ -549,7 +570,7 @@ public class SeckillServiceImpl implements ISeckillService {
     }
     Map<Object, Object> request = redis.opsForHash().entries("seckill:request:" + orderId);
     if (!String.valueOf(userId).equals(request.get("userId"))) {
-      return Result.fail("请求不存在");
+      return Result.fail("Request not found.");
     }
     Map<String, Object> result = new LinkedHashMap<>();
     result.put("order_id", String.valueOf(orderId));
@@ -558,13 +579,16 @@ public class SeckillServiceImpl implements ISeckillService {
     return Result.ok(result);
   }
 
-  /** 首次发布活动；已有抢购记录时拒绝重新初始化执行库存。 */
+  /** Publishes a campaign for the first time; refuses to reset runtime stock once claims exist. */
   @Override
   public Result publishActivity(long voucherId) {
     return prepareActivityPublication(voucherId, PublicationMode.INITIAL);
   }
 
-  /** 人工核对后的恢复入口；先确认共享 Stream 和持久预约中没有在途工作。 */
+  /**
+   * Recovery entry point after manual review; first confirms there is no in-flight work in the
+   * shared stream or the persisted reservations.
+   */
   @Override
   public Result recoverActivity(long voucherId) {
     return prepareActivityPublication(voucherId, PublicationMode.RECOVERY);
@@ -574,25 +598,28 @@ public class SeckillServiceImpl implements ISeckillService {
     boolean recovering = mode == PublicationMode.RECOVERY;
     RLock lock = redisson.getLock("lock:publish:" + voucherId);
     if (!lock.tryLock()) {
-      return Result.fail("活动正在准备");
+      return Result.fail("This drop is being prepared.");
     }
     try {
       SeckillPublication activity = seckillVoucherRepository.selectPublicationDetails(voucherId);
       if (activity == null) {
-        return Result.fail("活动不存在");
+        return Result.fail("Drop not found.");
       }
       String activityKey = "seckill:activity:" + voucherId;
       Result admission = checkPublicationAdmission(voucherId, recovering, activityKey);
       if (admission != null) {
         return admission;
       }
-      // 先暂停入口，再读持久事实和检查在途消息；失败时保持暂停，不能继续售卖。
+      // Pause entry first, then read persisted facts and check in-flight messages; on failure stay
+      // paused and never resume selling.
       redis.opsForHash().put(activityKey, "state", "PREPARING");
       if (recovering && hasUnfinishedActivityWork(voucherId)) {
-        return Result.fail("仍有在途或待核对请求，活动保持暂停，请先处理");
+        return Result.fail(
+            "Some requests are in flight or awaiting review. The drop stays paused until they're"
+                + " resolved.");
       }
       if (!recovering && seckillReservationRepository.countByVoucherId(voucherId) > 0) {
-        return Result.fail("已有抢购记录，请走核对恢复流程");
+        return Result.fail("This drop already has claims. Use the review and recovery flow.");
       }
       rebuildBuyerIndex(voucherId);
       activatePublication(activity, activityKey);
@@ -602,7 +629,7 @@ public class SeckillServiceImpl implements ISeckillService {
     }
   }
 
-  /** null 表示可继续准备；非 null 表示已完成或必须拒绝发布。 */
+  /** null means preparation may continue; non-null means it is done or publishing is refused. */
   private Result checkPublicationAdmission(long voucherId, boolean recovering, String activityKey) {
     if (recovering) {
       return null;
@@ -611,21 +638,23 @@ public class SeckillServiceImpl implements ISeckillService {
       return Result.ok();
     }
     if (seckillVoucherRepository.selectPublishedFlag(voucherId) == 1) {
-      return Result.fail("已发布活动的执行状态缺失，请先核对并恢复");
+      return Result.fail(
+          "This published drop is missing its runtime state. Review and recover it first.");
     }
     long buyers =
         Optional.ofNullable(redis.opsForSet().size("seckill:order:" + voucherId)).orElse(0L);
     long requests =
         Optional.ofNullable(redis.opsForHash().size("seckill:requests:" + voucherId)).orElse(0L);
     if (buyers > 0 || requests > 0) {
-      return Result.fail("已有抢购数据，请走核对恢复流程");
+      return Result.fail("This drop already has claim data. Use the review and recovery flow.");
     }
     return null;
   }
 
   private boolean hasUnfinishedActivityWork(long voucherId) {
     PendingMessages pending = redis.opsForStream().pending(STREAM, GROUP, Range.unbounded(), 1);
-    // Stream 由多活动共享；必须同时排除未读消息和未确认消息，不能只看本活动预约。
+    // The stream is shared by all campaigns; rule out both unread and unacknowledged messages, not
+    // just this campaign's reservations.
     boolean unreadMessages = hasUnreadStreamMessages();
     return !pending.isEmpty()
         || unreadMessages
@@ -672,9 +701,11 @@ public class SeckillServiceImpl implements ISeckillService {
   }
 
   /**
-   * 将待复核预约恢复为 PROCESSING，并在同一事务中登记重试任务。
+   * Moves a reservation under review back to PROCESSING and records a retry task in the same
+   * transaction.
    *
-   * <p>后续由投影重新进入 Stream，当前调用不直接履约，也不提前确认原消息。
+   * <p>The projection later puts it back into the stream; this call neither fulfills directly nor
+   * acknowledges the original message early.
    */
   @Override
   public Result retryReservation(long orderId) {
@@ -683,7 +714,7 @@ public class SeckillServiceImpl implements ISeckillService {
           SeckillReservation reservation =
               seckillReservationRepository.selectReservationForUpdate(orderId);
           if (reservation == null || !ReservationState.REVIEW.matches(reservation.getState())) {
-            return Result.fail("请求不在待核对状态");
+            return Result.fail("Request is not awaiting review.");
           }
           seckillReservationRepository.resetForRetry(orderId);
           businessOutboxRepository.insertSeckillRetry(orderId);
@@ -692,11 +723,14 @@ public class SeckillServiceImpl implements ISeckillService {
   }
 
   /**
-   * 人工确认失败后，保存 FAILED 状态并尝试补偿 Redis 预扣库存。
+   * After a failure is confirmed manually, saves the FAILED status and tries to restore the stock
+   * pre-deducted in Redis.
    *
-   * <p>数据库先提交，Redis 随后执行 Lua；两者不属于同一事务，补偿失败会保留已提交的状态。
+   * <p>The database commits first and Redis then runs the Lua script; they are not one transaction,
+   * so a failed compensation keeps the committed status.
    *
-   * <p>Lua 只释放与当前订单号匹配的购买资格，重复调用不会重复加库存或释放后续订单资格。
+   * <p>The Lua script only releases the admission matching the current order ID, so repeated calls
+   * never add stock twice or release a later order's admission.
    */
   @Override
   public Result markReservationFailedAndCompensateRedis(long orderId) {
@@ -706,14 +740,14 @@ public class SeckillServiceImpl implements ISeckillService {
               SeckillReservation reservation =
                   seckillReservationRepository.selectReservationForUpdate(orderId);
               if (reservation == null) {
-                return Result.fail("请求不存在");
+                return Result.fail("Request not found.");
               }
               if (!ReservationState.FAILED.matches(reservation.getState())
                   && !ReservationState.REVIEW.matches(reservation.getState())) {
-                return Result.fail("仅能处理已隔离的失败请求");
+                return Result.fail("Only quarantined failed requests can be handled.");
               }
               if (voucherOrderRepository.countByOrderId(orderId) > 0) {
-                return Result.fail("订单已经落库，不能回补库存");
+                return Result.fail("The order is already saved, so stock can't be restored.");
               }
               seckillReservationRepository.markFailed(orderId);
               return Result.ok(reservation);
@@ -734,15 +768,18 @@ public class SeckillServiceImpl implements ISeckillService {
             reservation.getUserId().toString(),
             String.valueOf(orderId));
     if (compensationResultCode == null || compensationResultCode < 0) {
-      return Result.fail("失败状态已保存，Redis 尚未补偿，请重试或核对恢复");
+      return Result.fail(
+          "Failure saved, but Redis stock wasn't restored. Retry, or review and recover.");
     }
     return Result.ok();
   }
 
   /**
-   * 读取数据库库存、已落库订单、持久预约和 Redis 库存，生成差异报告。
+   * Reads database stock, persisted orders, persisted reservations and Redis stock to build a
+   * discrepancy report.
    *
-   * <p>此方法记录观察指标，不覆盖或修复库存；差异还可能包含未登记的在途 Stream 消息。
+   * <p>This method records metrics and never overwrites or repairs stock; discrepancies may also
+   * include in-flight stream messages that are not yet recorded.
    */
   @Override
   public Result queryInventoryReconciliationReport(long voucherId) {
@@ -750,7 +787,7 @@ public class SeckillServiceImpl implements ISeckillService {
     report.put("voucher_id", voucherId);
     List<Map<String, Object>> inventoryRows = seckillVoucherRepository.selectInventory(voucherId);
     if (inventoryRows.isEmpty()) {
-      return Result.fail("活动不存在");
+      return Result.fail("Drop not found.");
     }
     long initialStock = ((Number) inventoryRows.get(0).get("total_stock")).longValue();
     long databaseRemainingStock = ((Number) inventoryRows.get(0).get("stock")).longValue();
@@ -772,7 +809,10 @@ public class SeckillServiceImpl implements ISeckillService {
             : databaseRemainingStock
                 - Long.parseLong(redisRemainingStock)
                 - unresolvedReservationCount);
-    report.put("note", "差异可能包含尚未被消费者登记的在途消息；本接口只报告，不覆盖库存");
+    report.put(
+        "note",
+        "Differences may include in-flight messages not yet recorded by consumers. This only"
+            + " reports and never overwrites stock.");
     metrics
         .counter(
             "hmdp.seckill.reconciliations",
@@ -792,10 +832,10 @@ public class SeckillServiceImpl implements ISeckillService {
         Map<String, Object> report =
             (Map<String, Object>) queryInventoryReconciliationReport(id).getData();
         if (report != null && !Boolean.TRUE.equals(report.get("database_consistent"))) {
-          log.warn("秒杀库存对账差异: {}", report);
+          log.warn("Seckill stock reconciliation mismatch: {}", report);
         }
       } catch (RuntimeException e) {
-        log.warn("秒杀对账暂时不可用: {}", id, e);
+        log.warn("Seckill reconciliation temporarily unavailable: {}", id, e);
       }
     }
   }

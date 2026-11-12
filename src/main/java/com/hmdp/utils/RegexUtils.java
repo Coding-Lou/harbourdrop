@@ -1,40 +1,37 @@
 package com.hmdp.utils;
 
-/**
- * @author 虎哥
- */
 public class RegexUtils {
   /**
-   * 是否是无效手机格式
+   * Whether the phone number format is invalid.
    *
-   * @param phone 要校验的手机号
-   * @return true:符合，false：不符合
+   * @param phone phone number to check
+   * @return true if invalid, false otherwise
    */
   public static boolean isPhoneInvalid(String phone) {
     return mismatch(phone, RegexPatterns.PHONE_REGEX);
   }
 
   /**
-   * 是否是无效邮箱格式
+   * Whether the email format is invalid.
    *
-   * @param email 要校验的邮箱
-   * @return true:符合，false：不符合
+   * @param email email to check
+   * @return true if invalid, false otherwise
    */
   public static boolean isEmailInvalid(String email) {
     return mismatch(email, RegexPatterns.EMAIL_REGEX);
   }
 
   /**
-   * 是否是无效验证码格式
+   * Whether the verification code format is invalid.
    *
-   * @param code 要校验的验证码
-   * @return true:符合，false：不符合
+   * @param code verification code to check
+   * @return true if invalid, false otherwise
    */
   public static boolean isCodeInvalid(String code) {
     return mismatch(code, RegexPatterns.VERIFY_CODE_REGEX);
   }
 
-  // 校验是否不符合正则格式
+  // Check whether the string fails to match the pattern
   private static boolean mismatch(String str, String regex) {
     if (str == null || str.isBlank()) {
       return true;

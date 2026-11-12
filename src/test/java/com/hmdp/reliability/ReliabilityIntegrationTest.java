@@ -528,8 +528,8 @@ class ReliabilityIntegrationTest extends IntegrationTestBase {
   void nearbySearchUsesDatabasePaginationAndStableOrdering() {
     ShopSearchDTO query = new ShopSearchDTO();
     query.setTypeId(1L);
-    query.setX(120.15);
-    query.setY(30.32);
+    query.setX(-123.105);
+    query.setY(49.283);
     query.setSort("distance");
     query.setPage(1);
     query.setSize(2);
@@ -543,7 +543,7 @@ class ReliabilityIntegrationTest extends IntegrationTestBase {
       assertTrue(page.get(0).getDistance() <= page.get(1).getDistance());
     }
     redis.delete(RedisConstants.SHOP_GEO_KEY + "1");
-    Result defaultPage = shops.queryShopByType(1, 1, 120.15, 30.32);
+    Result defaultPage = shops.queryShopByType(1, 1, -123.105, 49.283);
     assertTrue(defaultPage.getSuccess());
     @SuppressWarnings("unchecked")
     List<Shop> defaults = (List<Shop>) defaultPage.getData();

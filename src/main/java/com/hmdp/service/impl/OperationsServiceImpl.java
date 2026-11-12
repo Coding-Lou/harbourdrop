@@ -56,7 +56,7 @@ public class OperationsServiceImpl implements IOperationsService {
     }
     return businessOutboxRepository.retryReviewEvent(eventId) > 0
         ? Result.ok()
-        : Result.fail("任务不在待核对状态");
+        : Result.fail("Task is not awaiting review.");
   }
 
   @Override
@@ -78,7 +78,7 @@ public class OperationsServiceImpl implements IOperationsService {
   public Result retryAnalyticsEvent(String eventId) {
     return behaviorRepository.retryReviewEvent(eventId) > 0
         ? Result.ok()
-        : Result.fail("事件不在待核对状态");
+        : Result.fail("Event is not awaiting review.");
   }
 
   @Override

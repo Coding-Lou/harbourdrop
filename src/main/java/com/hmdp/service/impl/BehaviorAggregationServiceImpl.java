@@ -41,7 +41,7 @@ public class BehaviorAggregationServiceImpl implements IBehaviorAggregationServi
                 || !Objects.equals(old.get("action"), event.getAction())
                 || !Objects.equals(old.get("user_id"), event.getUserId())
                 || ((Number) old.get("occurred_at_ms")).longValue() != event.getOccurredAt()) {
-              throw new IllegalArgumentException("同一行为事件号对应不同内容");
+              throw new IllegalArgumentException("Behavior event ID reused with different content");
             }
             return null;
           }
@@ -61,7 +61,8 @@ public class BehaviorAggregationServiceImpl implements IBehaviorAggregationServi
   @Override
   public List<Map<String, Object>> ranking(int minutes, int limit) {
     if ((minutes != 5 && minutes != 60) || limit < 1 || limit > 100) {
-      throw new IllegalArgumentException("窗口仅支持 5 或 60 分钟，条数 1～100");
+      throw new IllegalArgumentException(
+          "Window must be 5 or 60 minutes, and limit must be 1-100.");
     }
     long now = System.currentTimeMillis() / 60000 * 60000;
     long from = now - (minutes - 1L) * 60000;

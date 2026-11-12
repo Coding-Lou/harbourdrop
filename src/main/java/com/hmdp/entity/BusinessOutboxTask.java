@@ -10,7 +10,8 @@ import lombok.Data;
 import org.hibernate.annotations.Immutable;
 
 /**
- * 可靠业务任务的数据库快照；用于内部处理，不直接作为页面响应。
+ * Database snapshot of a reliable business task; for internal processing, never returned as a
+ * page response.
  *
  * <p>Mapped as an immutable entity only so it can type the repository; rows are always read as
  * plain values through {@link #fromRow} and every write is an explicit conditional SQL statement.
@@ -24,23 +25,29 @@ public class BusinessOutboxTask {
   private String kind;
   private Long aggregateId;
 
-  /** 发起用户；活动重试等无用户归属的任务可以为空。 */
+  /** User who triggered the task; may be null for unowned tasks such as campaign retries. */
   private Long userId;
 
-  /** Feed 已处理到的关注关系行 ID，用于下一批查询；不是粉丝用户 ID。 */
+  /**
+   * ID of the last follow row the feed has processed, used to query the next batch; not a
+   * follower's user ID.
+   */
   private long cursorId;
 
   private String state;
   private int attempts;
   private int consumeAttempts;
 
-  /** 仅媒体删除任务使用，其他事件可以为空。 */
+  /** Used only by media deletion tasks; null for other events. */
   private String resourcePath;
 
-  /** 事件发生时间；Feed 续传沿用原值，防止排序时间随重试改变。 */
+  /**
+   * When the event occurred; feed continuations keep the original value so the sort time doesn't
+   * change across retries.
+   */
   private Timestamp createdAt;
 
-  /** 延迟事件的目标执行时间；普通事件为空。 */
+  /** Target execution time for delayed events; null for ordinary events. */
   private Timestamp deliverAt;
 
   /** Builds a task from a native-query row; columns that were not selected stay empty. */

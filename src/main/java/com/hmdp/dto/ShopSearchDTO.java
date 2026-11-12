@@ -9,10 +9,10 @@ public class ShopSearchDTO {
   private String area;
   private Long maxPrice;
 
-  /** 点评数据库中的评分，4.5 分传 45。 */
+  /** Rating on the database scale: pass 45 for 4.5. */
   private Integer minScore;
 
-  /** 只返回当前有可用优惠券的店铺。 */
+  /** Only return shops that currently have an available voucher. */
   private Boolean hasVoucher;
 
   private Double x;
@@ -20,6 +20,6 @@ public class ShopSearchDTO {
   private Integer page = 1;
   private Integer size = 10;
 
-  /** score、price 或 distance。 */
+  /** score, price, or distance. */
   private String sort = "score";
 }

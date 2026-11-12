@@ -1,6 +1,9 @@
 package com.hmdp.enums;
 
-/** 订单数据库状态码；免费券也使用 PAID 表示已领取，不能据此推断真实收款。 */
+/**
+ * Order status codes stored in the database; free vouchers also use PAID to mean claimed, so it
+ * doesn't imply money was received.
+ */
 public enum OrderStatus {
   UNPAID(1),
   PAID(2),

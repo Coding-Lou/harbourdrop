@@ -70,9 +70,11 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
   }
 
   /**
-   * 用短事务领取一批可投递任务，写入租约后提交。
+   * Claims a batch of deliverable tasks in a short transaction, writing the lease before
+   * committing.
    *
-   * <p>SKIP LOCKED 允许其他 worker 领取不同任务；网络投递放在提交之后，避免长时间持有行锁。
+   * <p>SKIP LOCKED lets other workers claim different tasks; network delivery happens after the
+   * commit to avoid holding row locks for long.
    */
   @Override
   public List<BusinessOutboxTask> claimOutboxBatch(String leaseOwner) {
@@ -88,13 +90,16 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
   }
 
   /**
-   * 领取并投递一批 Outbox 任务，不保证一次清空所有待处理任务。
+   * Claims and delivers one batch of outbox tasks; it does not guarantee draining every pending
+   * task in one call.
    *
-   * <p>每批使用独立租约 owner，过期或重叠执行时通过 owner 条件避免覆盖新 worker 的结果。
+   * <p>Each batch uses its own lease owner; on expiry or overlapping runs, the owner condition
+   * keeps a newer worker's results from being overwritten.
    */
   @Override
   public void relayOutboxBatch() {
-    // 批次独立 owner 防止同进程重叠调用在租约过期后互相覆盖。
+    // A per-batch owner stops overlapping calls in one process from overwriting each other once the
+    // lease expires.
     String leaseOwner = UUID.randomUUID().toString();
     for (BusinessOutboxTask task : claimOutboxBatch(leaseOwner)) {
       sendClaimedTask(task, leaseOwner);
@@ -114,7 +119,10 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     } catch (RuntimeException failure) {
       recordSendFailure(task, leaseOwner, failure);
       metrics.counter("hmdp.mq.sends", "result", "retry").increment();
-      log.warn("事件 {} 投递失败，将按原事件号重试: {}", task.getId(), FailureMessages.summarize(failure));
+      log.warn(
+          "Event {} delivery failed; retrying with the original event ID: {}",
+          task.getId(),
+          FailureMessages.summarize(failure));
     } finally {
       metrics.timer("hmdp.mq.send").record(System.nanoTime() - started, TimeUnit.NANOSECONDS);
     }
@@ -130,7 +138,8 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     }
     if (mqEnabled) {
       publishers.getObject().publish(event);
-      // 快速消费可能已经完成；owner/state 条件防止 DONE 被覆盖成 SENT。
+      // A fast consumer may already be done; the owner/state condition keeps DONE from being
+      // overwritten with SENT.
       businessOutboxRepository.markSent(task.getId(), leaseOwner);
       return true;
     }
@@ -166,9 +175,11 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
 
   @Scheduled(fixedDelay = 60000)
   /**
-   * 重新排队已发送但超过观察窗口仍未消费的事件，沿用原事件号。
+   * Requeues events that were sent but remain unconsumed past the observation window, keeping the
+   * original event ID.
    *
-   * <p>未来才到期的关单事件暂不重投；重投后的重复消费由 Inbox 与业务幂等规则处理。
+   * <p>Close events that are not yet due are not resent; duplicate consumption after a resend is
+   * handled by the inbox and business idempotency rules.
    */
   @Override
   public void redriveUnconsumedEvents() {

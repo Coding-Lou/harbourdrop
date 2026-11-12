@@ -81,7 +81,7 @@ class KafkaBusinessIntegrationTest extends IntegrationTestBase {
       }
       Thread.sleep(100);
     }
-    fail("真实 Kafka 消费未在 45 秒内完成");
+    fail("Real Kafka consumption did not finish within 45 seconds");
   }
 
   @Test

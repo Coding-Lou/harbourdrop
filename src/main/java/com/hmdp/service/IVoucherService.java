@@ -6,9 +6,8 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * 服务类
+ * Voucher service.
  *
- * @author 虎哥
  * @since 2021-12-22
  */
 public interface IVoucherService {

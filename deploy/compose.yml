@@ -81,6 +81,7 @@ services:
       HMDP_MQ_SECKILL_ENABLED: 'false'
       HMDP_ANALYTICS_ENABLED: 'false'
       HMDP_EXPERIENCE_ENABLED: 'true'
+      HMDP_DEMO_DROPS_ENABLED: ${HMDP_DEMO_DROPS_ENABLED:-true}
       HMDP_MONITOR_TOKEN: ${HMDP_MONITOR_TOKEN:?Run init-env.sh first}
       HMDP_JWT_SECRET: ${HMDP_JWT_SECRET:?Run init-env.sh first}
       # This small demo host has no SMTP. Codes are logged only because the operator opts in here;
@@ -94,7 +95,7 @@ services:
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_STARTTLS:-true}
-      HMDP_MAIL_FROM: ${HMDP_MAIL_FROM:-no-reply@hmdp.local}
+      HMDP_MAIL_FROM: ${HMDP_MAIL_FROM:-no-reply@harbourdrop.local}
       HMDP_UPLOAD_DIR: /uploads
       CITYLENS_CATALOG_ADMIN_IDS: ${HMDP_ADMIN_IDS:-}
       CITYLENS_PAYMENT_MOCK_ENABLED: ${HMDP_PAYMENT_MOCK_ENABLED:-false}

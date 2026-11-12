@@ -5,7 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** 统一业务响应；泛型只约束 Java 内部类型，JSON 字段保持不变。 */
+/** Uniform business response; generics only constrain Java-side types, the JSON is unchanged. */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

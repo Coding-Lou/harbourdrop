@@ -1,5 +1,5 @@
 export const cacheLayers = [
-  { key: "scope", name: "请求内缓存" },
+  { key: "scope", name: "Request scope" },
   { key: "jvm", name: "Caffeine" },
   { key: "redis", name: "Redis" },
   { key: "mysql", name: "MySQL" },
@@ -27,7 +27,7 @@ export function readSource(read) {
   return source
     ? cacheLayers.find((layer) => layer.key === source.layer)?.name ||
         source.layer
-    : "未采样";
+    : "Not sampled";
 }
 
 export function receiptsComplete(ids, rows, shopId) {
@@ -62,12 +62,12 @@ export function sameOrder(first, second) {
 export function orderStatus(order) {
   return (
     {
-      1: "待付款",
-      2: "已领取 / 待核销",
-      3: "已核销",
-      4: "已取消",
-      5: "退款中",
-      6: "已退款",
-    }[Number(order?.status)] || "状态待确认"
+      1: "Awaiting payment",
+      2: "Claimed / awaiting redemption",
+      3: "Redeemed",
+      4: "Cancelled",
+      5: "Refund in progress",
+      6: "Refunded",
+    }[Number(order?.status)] || "Status unconfirmed"
   );
 }

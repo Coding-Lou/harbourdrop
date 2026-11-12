@@ -103,7 +103,7 @@ public class CacheClient {
     try {
       return mapper.writeValueAsString(value);
     } catch (JsonProcessingException e) {
-      throw new IllegalStateException("缓存对象无法序列化", e);
+      throw new IllegalStateException("Cache value cannot be serialized", e);
     }
   }
 
@@ -130,7 +130,7 @@ public class CacheClient {
   /** A cached value that cannot be read, such as an entry written by an older serializer. */
   static final class UndecodableCacheValue extends RuntimeException {
     UndecodableCacheValue(Throwable cause) {
-      super("缓存内容无法解析", cause);
+      super("Cache content cannot be parsed", cause);
     }
   }
 
@@ -146,9 +146,11 @@ public class CacheClient {
   }
 
   /**
-   * 递增整个本地缓存命名空间的世代，后续请求改用新世代查询。
+   * Advances the generation of the whole local cache namespace; later requests query the new
+   * generation.
    *
-   * <p>旧加载即使晚到，也只能写入旧世代；这是逻辑失效，不是按单个 key 立即删除全部对象。
+   * <p>A late load can only write into the old generation; this is logical invalidation, not
+   * immediate deletion of every object by key.
    */
   public void advanceLocalCacheGeneration() {
     generation.incrementAndGet();
@@ -181,7 +183,7 @@ public class CacheClient {
                   invalidate(key);
                 }
               } catch (RuntimeException failure) {
-                throw new IllegalStateException("缓存命名空间失效失败", failure);
+                throw new IllegalStateException("Cache namespace invalidation failed", failure);
               }
               return null;
             });
@@ -200,9 +202,10 @@ public class CacheClient {
   }
 
   /**
-   * 把传入时长统一换算为毫秒，并增加不足基准 TTL 10% 的随机抖动。
+   * Converts the duration to milliseconds and adds random jitter of under 10% of the base TTL.
    *
-   * <p>分散同批缓存的过期时间，减少集中回源；返回值始终以毫秒为单位。
+   * <p>Spreads out the expiry of caches written together to reduce simultaneous reloads; the
+   * return value is always in milliseconds.
    */
   private long calculateTtlMillisWithJitter(Long duration, TimeUnit durationUnit) {
     long baseTtlMillis = durationUnit.toMillis(duration);
@@ -299,7 +302,7 @@ public class CacheClient {
       }
       pauseBeforeRetry();
     } while (System.nanoTime() < deadline);
-    throw new IllegalStateException("热点数据正在重建，请稍后重试");
+    throw new IllegalStateException("Hot key is being rebuilt; please try again later");
   }
 
   private CacheSnapshot rebuildUnderLock(LoadRequest request, String lockKey, String owner) {
@@ -316,7 +319,8 @@ public class CacheClient {
           json.isEmpty()
               ? calculateTtlMillisWithJitter(RedisConstants.CACHE_NULL_TTL, TimeUnit.MINUTES)
               : request.ttlMillis;
-      // 同时校验加载前版本与锁 owner；旧加载可返回给本次请求，但不能污染后续缓存。
+      // Check both the pre-load version and the lock owner; a stale load may be returned to this
+      // request but must not pollute later cache reads.
       Long written =
           redis.execute(
               FILL,
@@ -342,14 +346,16 @@ public class CacheClient {
       Thread.sleep(RETRY_BASE_MILLIS + ThreadLocalRandom.current().nextInt(RETRY_JITTER_MILLIS));
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      throw new IllegalStateException("缓存查询已中断", interrupted);
+      throw new IllegalStateException("Cache query was interrupted", interrupted);
     }
   }
 
   /**
-   * 保留原教学入口；当前委托给统一的多层缓存和互斥回源实现。
+   * Kept as the original teaching entry point; now delegates to the unified multi-level cache
+   * with mutex-guarded reloads.
    *
-   * <p>方法名源于早期缓存穿透示例，实际读取策略请以 queryWithMutex 为准。
+   * <p>The name comes from an early cache-penetration example; see queryWithMutex for the actual
+   * read strategy.
    */
   public <R, ID> R queryWithPassThrough(
       String prefix,
@@ -498,7 +504,7 @@ public class CacheClient {
                     owner);
                 advanceLocalCacheGeneration();
               } catch (RuntimeException e) {
-                log.warn("缓存重建失败: {}", key, e);
+                log.warn("Cache rebuild failed: {}", key, e);
               } finally {
                 redis.execute(UNLOCK, Collections.singletonList(lockKey), owner);
               }

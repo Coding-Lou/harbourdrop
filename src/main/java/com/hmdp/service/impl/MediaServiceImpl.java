@@ -52,7 +52,7 @@ public class MediaServiceImpl implements IMediaService {
   @Override
   public boolean lockOwnedImages(String images, long user) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("图片引用需要业务事务");
+      throw new IllegalStateException("Image reference requires a business transaction");
     }
     try {
       // All publishers lock paths in the same order; deletion locks the same owner row.
@@ -73,7 +73,7 @@ public class MediaServiceImpl implements IMediaService {
   @Override
   public void attach(long blog, String images) {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
-      throw new IllegalStateException("图片引用需要业务事务");
+      throw new IllegalStateException("Image reference requires a business transaction");
     }
     for (String path : paths(images)) {
       mediaRepository.insertBlogReference(blog, path);
@@ -92,13 +92,13 @@ public class MediaServiceImpl implements IMediaService {
         tx -> {
           List<Map<String, Object>> rows = mediaRepository.selectOwnerForUpdate(path);
           if (rows.isEmpty() || ((Number) rows.get(0).get("user_id")).longValue() != user) {
-            return Result.fail("图片不存在或无权删除");
+            return Result.fail("Image not found, or you can't delete it.");
           }
           if (!"ACTIVE".equals(rows.get(0).get("state"))) {
             return Result.ok();
           }
           if (!mediaRepository.selectReferencesForUpdate(path).isEmpty()) {
-            return Result.fail("图片已用于笔记，不能直接删除");
+            return Result.fail("This image is used in a post and can't be deleted.");
           }
           mediaRepository.markDeleting(path);
           outbox.appendMediaDeletionEvent(path, user);
@@ -112,18 +112,18 @@ public class MediaServiceImpl implements IMediaService {
   @Override
   public Result upload(MultipartFile image, long user) {
     try {
-      // 获取原始文件名称
+      // Get the original file name
       String originalFilename = image.getOriginalFilename();
       if (image.isEmpty()
           || image.getSize() > 5000000
           || originalFilename == null
           || !originalFilename.toLowerCase().matches(".*\\.(jpg|jpeg|png|webp)$")) {
-        return Result.fail("图片类型或大小不合法");
+        return Result.fail("Invalid image type or size.");
       }
       byte[] signature = new byte[12];
       try (InputStream stream = image.getInputStream()) {
         if (stream.read(signature) < 12) {
-          return Result.fail("图片内容不合法");
+          return Result.fail("Invalid image content.");
         }
       }
       String lower = originalFilename.toLowerCase(Locale.ROOT);
@@ -141,36 +141,36 @@ public class MediaServiceImpl implements IMediaService {
                   && new String(signature, 0, 4, StandardCharsets.US_ASCII).equals("RIFF")
                   && new String(signature, 8, 4, StandardCharsets.US_ASCII).equals("WEBP"));
       if (!valid) {
-        return Result.fail("文件内容与图片类型不匹配");
+        return Result.fail("File content doesn't match the image type.");
       }
-      // 生成新文件名
+      // Generate a new file name
       String fileName = createNewFileName(lower);
-      // 保存文件
+      // Save the file
       image.transferTo(new File(uploadDir, fileName));
       mediaRepository.insertOwner(fileName, user);
-      // 返回结果
-      log.debug("文件上传成功，{}", fileName);
+      // Return the result
+      log.debug("File uploaded: {}", fileName);
       return Result.ok(fileName);
     } catch (IOException e) {
-      throw new RuntimeException("文件上传失败", e);
+      throw new RuntimeException("File upload failed", e);
     }
   }
 
   private String createNewFileName(String originalFilename) {
-    // 获取后缀
+    // Get the extension
     int dot = originalFilename == null ? -1 : originalFilename.lastIndexOf('.');
     String suffix = dot < 0 ? "" : originalFilename.substring(dot + 1);
-    // 生成目录
+    // Generate the directories
     String name = UUID.randomUUID().toString();
     int hash = name.hashCode();
     int d1 = hash & 0xF;
     int d2 = (hash >> 4) & 0xF;
-    // 判断目录是否存在
+    // Check whether the directory exists
     File dir = new File(uploadDir, String.format("/blogs/%d/%d", d1, d2));
     if (!dir.exists()) {
       dir.mkdirs();
     }
-    // 生成文件名
+    // Generate the file name
     return String.format("/blogs/%d/%d/%s.%s", d1, d2, name, suffix);
   }
 }

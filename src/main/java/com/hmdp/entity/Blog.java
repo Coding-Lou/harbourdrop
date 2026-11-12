@@ -15,7 +15,8 @@ import org.hibernate.annotations.DynamicInsert;
 import org.hibernate.annotations.DynamicUpdate;
 
 /**
- * @author 虎哥
+ * A user's post about a shop visit.
+ *
  * @since 2021-12-22
  */
 @Data
@@ -29,44 +30,44 @@ public class Blog implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
-  /** 主键 */
+  /** Primary key */
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
-  /** 商户id */
+  /** Shop ID */
   private Long shopId;
 
-  /** 用户id */
+  /** User ID */
   private Long userId;
 
-  /** 用户图标 */
+  /** User avatar */
   @Transient private String icon;
 
-  /** 用户姓名 */
+  /** User name */
   @Transient private String name;
 
-  /** 是否点赞过了 */
+  /** Whether the current user has liked it */
   @Transient private Boolean isLike;
 
-  /** 标题 */
+  /** Title */
   private String title;
 
-  /** 探店的照片，最多9张，多张以","隔开 */
+  /** Visit photos, up to 9, separated by "," */
   private String images;
 
-  /** 探店的文字描述 */
+  /** Text of the visit post */
   private String content;
 
-  /** 点赞数量 */
+  /** Like count */
   private Integer liked;
 
-  /** 评论数量 */
+  /** Comment count */
   private Integer comments;
 
-  /** 创建时间 */
+  /** Created at */
   private LocalDateTime createTime;
 
-  /** 更新时间 */
+  /** Updated at */
   private LocalDateTime updateTime;
 }

@@ -1,6 +1,6 @@
 package com.hmdp.enums;
 
-/** 优惠券数据库类型码。 */
+/** Voucher type codes stored in the database. */
 public enum VoucherType {
   ORDINARY(0),
   SECKILL(1);

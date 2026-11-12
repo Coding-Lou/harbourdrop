@@ -1,8 +1,10 @@
-# 黑马点评项目 Wiki
+# HarbourDrop 项目 Wiki
+
+> 本项目起点是黑马点评课程脚手架，现已改为温哥华本地主题 **HarbourDrop**：餐厅和面包店在打烊前限量发布“剩余食物惊喜袋”（原秒杀券，带到店取货时间窗），另有常规餐饮优惠（原普通券）。界面与接口文案为英文；店铺、用户和评价均为虚构数据，坐标取自温哥华真实街区。下文中的“秒杀券 / 普通券 / 探店笔记”分别对应界面上的 drop（惊喜袋）/ deal（优惠）/ review（评价）。本地 Docker 环境默认开启 `HMDP_DEMO_DROPS_ENABLED`：`DemoDropServiceImpl` 每 15 分钟检查几家种子店铺，没有在售或即将开售的惊喜袋时，就通过与管理员相同的 `addSeckillVoucher` 路径（Outbox → Redis 发布）创建一个新的，保证演示时总有可抢的袋子。
 
 > 面向第一次接触 Spring Boot、Redis 和消息队列的同学。本文档依据当前点评项目源码整理，参考课程讲义《Redis实战篇》（不在本仓库中）的“业务问题 → 原理 → 实现 → 验证”讲解方式。代码核对日期：2026-11-12（`na-stack-migration` 分支，技术栈迁移后）。
 
-这个项目是一套可以在浏览器中体验的本地生活系统：用户找店铺、看探店笔记、关注作者、签到、领取优惠券，并查看自己的订单。后端在课程基础上增加了多层缓存、缓存变更同步、可靠业务消息、异步秒杀履约、超时关单、行为热榜和体验验证页面。
+这个项目是一套可以在浏览器中体验的本地生活系统：用户找附近的餐厅、看评价、关注作者、签到、抢限量惊喜袋或领取优惠，并查看自己的订单。后端在课程基础上增加了多层缓存、缓存变更同步、可靠业务消息、异步秒杀履约、超时关单、行为热榜和体验验证页面。
 
 当前技术栈：Java 21 / Spring Boot 3.5、Spring Data JPA（Hibernate，原生 SQL 写在 `@Query` 中）+ Flyway、MySQL 8、Redis 7 + Caffeine、Kafka（业务事件与行为分析共用一个集群）、Debezium（运行在 Kafka Connect 上的 CDC）、Spring Security + JWT（邮箱验证码登录）、Testcontainers 测试、OpenTelemetry + Jaeger 链路追踪。迁移前的 MyBatis-Plus、RocketMQ、Canal、Memcache、Hutool、手机号登录已经移除；部分章节文件名仍沿用旧名（如 05、06、09 章），内容以当前实现为准。
 
@@ -103,7 +105,7 @@ flowchart LR
 
 ## 证据与版本说明
 
-**当前结果**：2026-11-12 在 `na-stack-migration` 分支上执行 `./mvnw verify`（Checkstyle + 全部单元/集成测试，依赖由 Testcontainers 自动启动），111 项 Java 测试全部通过、0 跳过，其中包括真实 Debezium 容器的 CDC 测试、真实 Kafka 的业务消息测试和 Spring Security 端到端测试；前端 `npm --prefix frontend test` 14 项通过。这是测试结果，不代表读者打开文档或点击页面就运行了所有故障测试。
+**当前结果**：2026-11-12 在 `na-stack-migration` 分支上执行 `./mvnw verify`（Checkstyle + 全部单元/集成测试，依赖由 Testcontainers 自动启动），113 项 Java 测试全部通过、0 跳过，其中包括真实 Debezium 容器的 CDC 测试、真实 Kafka 的业务消息测试和 Spring Security 端到端测试；前端 `npm --prefix frontend test` 17 项通过。这是测试结果，不代表读者打开文档或点击页面就运行了所有故障测试。
 
 **迁移前的历史记录**：`docs/` 下 2026-10 的报告都属于迁移前版本（Java 8、MyBatis-Plus、RocketMQ、Canal、Memcache），保留为历史，不与当前结果相加或混用。[页面验证报告](../docs/experience-verification.json) 记录了 2026-10-10 的 90 项 Java 隔离回归测试、12 项前端测试与格式检查；2026-10-11 的 [可读性验证](../docs/java-readability-verification.json) 和 [命名与注释验证](../docs/java-naming-verification.json) 记录 91 项不同回归用例通过，最终 37 项重点用例为同一批覆盖的子集，不能相加为 128 项；[缓存对比报告](../docs/cache-benchmark.json) 生成于 2026-10-11，测量时缓存链路还包含 Memcache 层。其他历史优化记录见 [优化实现与验证](../docs/优化实现与验证.md)。旧记录中的组件名、默认前端、TTL、测试数量属于之前的迭代；本 Wiki 用当前源码解释行为。
 
