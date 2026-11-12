@@ -9,6 +9,7 @@ import com.hmdp.utils.CacheClient;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -77,10 +78,12 @@ class CacheBenchmarkIntegrationTest extends IntegrationTestBase {
           "scope",
           "Testcontainers MySQL 8 / Redis 7. One Java instance; "
               + "warm hot-key HTTP test, not a production capacity claim.");
-      Files.createDirectories(Paths.get("docs"));
-      new ObjectMapper()
-          .writerWithDefaultPrettyPrinter()
-          .writeValue(Paths.get("docs/cache-benchmark.json").toFile(), report);
+      // Written to the build directory so ordinary test runs never rewrite the published record in
+      // docs/. Pass -Dhmdp.benchmark.report=docs/cache-benchmark.json to publish deliberately.
+      Path output =
+          Paths.get(System.getProperty("hmdp.benchmark.report", "target/cache-benchmark.json"));
+      Files.createDirectories(output.toAbsolutePath().getParent());
+      new ObjectMapper().writerWithDefaultPrettyPrinter().writeValue(output.toFile(), report);
     } finally {
       ReflectionTestUtils.setField(cache, "enabled", true);
       cache.invalidate("cache:shop:1");
