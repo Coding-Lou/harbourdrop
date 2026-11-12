@@ -371,7 +371,7 @@ Vue.component("experience-page", {
   template: `
     <div class="experience-page">
       <section class="experience-hero">
-        <div><span class="eyebrow">Under the hood · from click to result</span><h1>Don't take the résumé's word for it.</h1><p>Pick a shop, press a button, and see what actually happens behind a real request.</p><div class="experience-badges"><span>First two need no sign-in</span><span>Real APIs and receipts</span><span>About a minute to try</span></div></div>
+        <div><span class="eyebrow">Under the hood · from click to result</span><h1>See what happens behind each request.</h1><p>Pick a shop, press a button, and see what actually happens behind a real request.</p><div class="experience-badges"><span>First two need no sign-in</span><span>Real APIs and receipts</span><span>About a minute to try</span></div></div>
         <div class="experience-hero-mark"><i class="el-icon-data-line" aria-hidden="true"></i><span>TRY · OBSERVE · UNDERSTAND</span></div>
       </section>
       <div v-if="error" class="experience-error" role="alert">{{ error }}<button class="text-button" @click="error = ''">Dismiss</button></div>

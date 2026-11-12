@@ -18,9 +18,9 @@ Drops sell out in minutes, so the Spring Boot 3 backend is built to stay **corre
 | --- | --- |
 | ![Home page with Vancouver categories and reviews](docs/images/home.png) | ![Drops and deals with stock left and pickup windows](docs/images/drops.png) |
 
-![Under-the-hood page showing cache layers and Kafka/Debezium status](docs/images/experience.png)
+![Under-the-hood page after a run: the cache layer and backend time of every read, and three Kafka page-view events consumed and persisted](docs/images/experience.png)
 
-The "Under the hood" page calls the real APIs and shows which cache layer served each read, whether Kafka events were persisted, and each order's outbox/inbox progress.
+The "Under the hood" page calls the real APIs. Above, three requests each read a shop twice: the first read came from Redis, later ones from Caffeine or the request-scope cache, and none reached MySQL. Three page-view events were then followed through Kafka until each was persisted. The same page also tracks an order's outbox/inbox progress.
 
 ## Highlights
 
