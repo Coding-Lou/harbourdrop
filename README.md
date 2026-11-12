@@ -129,7 +129,7 @@ docker compose -p hm-dianping -f dev/docker-compose.yml down
 | `HMDP_TRACING_ENABLED` | false | 打开 OpenTelemetry 链路追踪 |
 | `HMDP_UPLOAD_HOST_DIR` | `./data/uploads` | 宿主机上传目录（相对 `dev/`） |
 
-管理员 ID 从正常登录后的 `GET /user/me` 获取。管理员身份每次请求按白名单计算，不写进令牌，删除 ID 立即生效。配置可以保存在项目根目录自己的 `.env` 中；修改环境后用 `up -d` 重新创建相应服务，`restart` 不刷新环境变量。
+管理员 ID 从正常登录后的 `GET /user/me` 获取。管理员身份不写进令牌，而是每次请求按启动时读取的白名单判断：修改白名单并重建 Java 后，已经签发的令牌也立即按新名单处理，无需用户重新登录。配置可以保存在项目根目录自己的 `.env` 中；修改环境后用 `up -d` 重新创建相应服务，`restart` 不刷新环境变量。
 
 单独启动 Java 时，体验、CDC、业务消息和分析功能默认关闭，邮件也未配置（此时获取验证码会失败，不会把验证码写进日志）；完整 Compose 会启用这些扩展。变量映射与独立运行配置以 [配置附录](wiki/附录-接口配置与数据字典.md) 为准。
 

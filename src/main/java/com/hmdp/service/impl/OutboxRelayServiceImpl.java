@@ -40,6 +40,7 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
   private final AtomicLong pending = new AtomicLong();
   private final AtomicLong review = new AtomicLong();
   private final AtomicLong inflight = new AtomicLong();
+  private final AtomicLong scheduled = new AtomicLong();
 
   @Value("${hmdp.mq.enabled:false}")
   private boolean mqEnabled;
@@ -65,6 +66,7 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     metrics.gauge("hmdp.outbox.pending", pending);
     metrics.gauge("hmdp.outbox.review", review);
     metrics.gauge("hmdp.outbox.inflight", inflight);
+    metrics.gauge("hmdp.outbox.scheduled", scheduled);
   }
 
   /**
@@ -181,5 +183,6 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     pending.set(businessOutboxRepository.countPendingEvents());
     review.set(businessOutboxRepository.countReviewEvents());
     inflight.set(businessOutboxRepository.countDueSentEvents());
+    scheduled.set(businessOutboxRepository.countScheduledEvents());
   }
 }

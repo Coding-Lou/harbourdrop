@@ -349,9 +349,24 @@ public interface BusinessOutboxRepository extends Repository<BusinessOutboxTask,
           SELECT COUNT(*)
           FROM tb_business_outbox
           WHERE state IN ('PENDING','SENDING')
+            AND (deliver_at IS NULL OR deliver_at<=NOW(3))
           """,
       nativeQuery = true)
   Long countPendingEvents();
+
+  /**
+   * Deadlines waiting in the outbox until they are due. Kafka has no per-message delay, so these
+   * are scheduled work, not backlog, and are kept out of {@link #countPendingEvents()}.
+   */
+  @Query(
+      value =
+          """
+          SELECT COUNT(*)
+          FROM tb_business_outbox
+          WHERE state='PENDING' AND deliver_at>NOW(3)
+          """,
+      nativeQuery = true)
+  Long countScheduledEvents();
 
   @Query(
       value =

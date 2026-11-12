@@ -49,4 +49,29 @@ class RepositoryRowsIntegrationTest extends IntegrationTestBase {
       jdbc.update("DELETE FROM tb_seckill_reservation WHERE order_id=?", ORDER);
     }
   }
+
+  @Autowired BusinessOutboxRepository outbox;
+
+  @Test
+  void futureDeadlinesAreScheduledWorkNotBacklog() {
+    long pending = outbox.countPendingEvents();
+    long scheduled = outbox.countScheduledEvents();
+    jdbc.update(
+        "INSERT INTO tb_business_outbox(kind,aggregate_id,user_id,deliver_at) "
+            + "VALUES('ORDER_EXPIRE',931010,?,TIMESTAMPADD(MINUTE,30,NOW(3)))",
+        USER);
+    try {
+      assertEquals(pending, outbox.countPendingEvents());
+      assertEquals(scheduled + 1, outbox.countScheduledEvents());
+      jdbc.update(
+          "UPDATE tb_business_outbox SET deliver_at=TIMESTAMPADD(SECOND,-1,NOW(3)) "
+              + "WHERE aggregate_id=931010 AND kind='ORDER_EXPIRE'");
+      // Once due and still unsent, it is real backlog again.
+      assertEquals(pending + 1, outbox.countPendingEvents());
+      assertEquals(scheduled, outbox.countScheduledEvents());
+    } finally {
+      jdbc.update(
+          "DELETE FROM tb_business_outbox WHERE aggregate_id=931010 AND kind='ORDER_EXPIRE'");
+    }
+  }
 }

@@ -176,7 +176,10 @@ public class SecurityConfig {
     return http.build();
   }
 
-  /** Admin rights are evaluated per request, so removing an ID takes effect immediately. */
+  /**
+   * The admin list is read at startup and the role is never stored in tokens, so after a restart
+   * even already-issued tokens are judged against the new list.
+   */
   private static List<GrantedAuthority> roles(Jwt token, Set<String> admins) {
     List<GrantedAuthority> roles = new ArrayList<>();
     roles.add(new SimpleGrantedAuthority("ROLE_USER"));
