@@ -96,8 +96,8 @@ hmdp:
   cache:
     enabled: true
   cdc:
+    # Debezium (Kafka Connect) publishes binlog changes to <topic-prefix>.<schema>.<table>.
     enabled: ${HMDP_CDC_ENABLED:false}
-    host: ${HMDP_CDC_HOST:127.0.0.1}
-    port: ${HMDP_CDC_PORT:11111}
     schema: ${HMDP_CDC_SCHEMA:hmdp}
-    destination: ${HMDP_CDC_DESTINATION:example}
+    topic-prefix: ${HMDP_CDC_TOPIC_PREFIX:hmdp-cdc}
+    group: ${HMDP_CDC_GROUP:hmdp-cache-cdc}

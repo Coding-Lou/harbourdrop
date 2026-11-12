@@ -41,21 +41,16 @@ groups:
         for: 1m
         labels: {severity: critical}
         annotations: {summary: "点评接口或监控凭证不可用"}
-      - alert: CanalServerDown
-        expr: up{job="canal"} == 0
-        for: 1m
-        labels: {severity: critical}
-        annotations: {summary: "Canal 服务不可达"}
       - alert: CacheCdcDisconnected
         expr: (max(hmdp_cdc_connected) == 0) and (max(hmdp_cdc_enabled) == 1)
         for: 1m
         labels: {severity: critical}
-        annotations: {summary: "Canal 同步连接中断"}
+        annotations: {summary: "CDC（Debezium → Kafka）消费分区未分配"}
       - alert: CacheCdcPollingStalled
         expr: hmdp_cdc_poll_age_seconds > 30 and hmdp_cdc_connected == 1
         for: 1m
         labels: {severity: critical}
-        annotations: {summary: "Canal 消费者停止轮询"}
+        annotations: {summary: "CDC 消费者停止轮询"}
       - alert: CacheCdcRetries
         expr: sum(increase(hmdp_cdc_batches_total{result="retry"}[5m])) > 0
         for: 1m
@@ -65,7 +60,7 @@ groups:
         expr: histogram_quantile(0.95, sum by(le)(rate(hmdp_cdc_event_delay_seconds_bucket[5m]))) > 10
         for: 2m
         labels: {severity: warning}
-        annotations: {summary: "Canal 事件处理延迟超过 10 秒"}
+        annotations: {summary: "CDC 事件处理延迟超过 10 秒"}
       - alert: SeckillBacklog
         expr: max(hmdp_seckill_lag) > 1000 or max(hmdp_seckill_pending) > 100
         for: 1m

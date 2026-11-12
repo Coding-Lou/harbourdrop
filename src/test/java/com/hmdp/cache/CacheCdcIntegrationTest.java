@@ -1,53 +1,150 @@
 package com.hmdp.cache;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import com.alibaba.otter.canal.client.CanalConnector;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.impl.SeckillServiceImpl;
 import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.CacheClient;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContext;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
 
-@Disabled("Rewritten for Debezium in migration phase 6")
+/**
+ * End-to-end CDC: direct SQL on MySQL -> binlog -> Debezium (Kafka Connect) -> Kafka -> cache
+ * invalidation and warm-up. Nothing in these tests goes through the service layer or the outbox.
+ */
 @SpringBootTest(
-    webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {"citylens.reliability.scheduling-enabled=false", "hmdp.cdc.enabled=true"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CacheCdcIntegrationTest extends IntegrationTestBase {
+  private static final String CONNECTOR = "hmdp-cache-test";
+
+  static final GenericContainer<?> CONNECT =
+      new GenericContainer<>(DockerImageName.parse("quay.io/debezium/connect:3.7.1.Final"))
+          .withNetwork(NETWORK)
+          .withExposedPorts(8083)
+          .withEnv("BOOTSTRAP_SERVERS", KAFKA_INTERNAL_BOOTSTRAP)
+          .withEnv("GROUP_ID", "hmdp-connect-test")
+          .withEnv("CONFIG_STORAGE_TOPIC", "test_connect_configs")
+          .withEnv("OFFSET_STORAGE_TOPIC", "test_connect_offsets")
+          .withEnv("STATUS_STORAGE_TOPIC", "test_connect_statuses")
+          .withEnv("CONFIG_STORAGE_REPLICATION_FACTOR", "1")
+          .withEnv("OFFSET_STORAGE_REPLICATION_FACTOR", "1")
+          .withEnv("STATUS_STORAGE_REPLICATION_FACTOR", "1")
+          .withEnv("HEAP_OPTS", "-Xms256m -Xmx512m")
+          .dependsOn(KAFKA, MYSQL)
+          .waitingFor(
+              Wait.forHttp("/connectors").forPort(8083).withStartupTimeout(Duration.ofMinutes(3)));
+
+  static {
+    CONNECT.start();
+    registerConnector();
+  }
+
   @Autowired JdbcTemplate jdbc;
   @Autowired StringRedisTemplate redis;
   @Autowired CacheClient cache;
   @Autowired MeterRegistry metrics;
   @Autowired SeckillServiceImpl seckill;
-  @Autowired ApplicationContext context;
+  @Autowired DebeziumCacheConsumer consumer;
+
+  private static void registerConnector() {
+    String config =
+        """
+        {
+          "connector.class": "io.debezium.connector.mysql.MySqlConnector",
+          "tasks.max": "1",
+          "database.hostname": "mysql",
+          "database.port": "3306",
+          "database.user": "%s",
+          "database.password": "%s",
+          "database.server.id": "5402",
+          "topic.prefix": "hmdp-cdc",
+          "database.include.list": "%s",
+          "table.include.list": "%s\\\\.tb_shop,%s\\\\.tb_voucher,%s\\\\.tb_seckill_voucher",
+          "snapshot.mode": "no_data",
+          "include.schema.changes": "true",
+          "tombstones.on.delete": "false",
+          "schema.history.internal.kafka.bootstrap.servers": "%s",
+          "schema.history.internal.kafka.topic": "hmdp-cdc.schema-history",
+          "schema.history.internal.store.only.captured.tables.ddl": "true",
+          "topic.creation.default.partitions": "1",
+          "topic.creation.default.replication.factor": "1",
+          "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+          "key.converter.schemas.enable": "false",
+          "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+          "value.converter.schemas.enable": "false"
+        }
+        """
+            .formatted(
+                MYSQL.getUsername(),
+                MYSQL.getPassword(),
+                DATABASE,
+                DATABASE,
+                DATABASE,
+                DATABASE,
+                KAFKA_INTERNAL_BOOTSTRAP);
+    String base = "http://" + CONNECT.getHost() + ":" + CONNECT.getMappedPort(8083);
+    HttpClient http = HttpClient.newHttpClient();
+    try {
+      HttpResponse<String> created =
+          http.send(
+              HttpRequest.newBuilder(URI.create(base + "/connectors/" + CONNECTOR + "/config"))
+                  .header("Content-Type", "application/json")
+                  .PUT(HttpRequest.BodyPublishers.ofString(config))
+                  .build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertTrue(created.statusCode() / 100 == 2, created.body());
+      // Changes made before the binlog reader starts would be missed, so wait for RUNNING.
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90);
+      while (System.nanoTime() < deadline) {
+        String status =
+            http.send(
+                    HttpRequest.newBuilder(
+                            URI.create(base + "/connectors/" + CONNECTOR + "/status"))
+                        .build(),
+                    HttpResponse.BodyHandlers.ofString())
+                .body();
+        if (status.contains("\"tasks\":[{\"id\":0,\"state\":\"RUNNING\"")) {
+          return;
+        }
+        Thread.sleep(500);
+      }
+      fail("Debezium connector did not reach RUNNING");
+    } catch (Exception e) {
+      throw new IllegalStateException("Debezium connector registration failed", e);
+    }
+  }
 
   @BeforeEach
-  void guard() {
+  void guard() throws Exception {
     assertEquals("hmdp_optimization_test", jdbc.queryForObject("SELECT DATABASE()", String.class));
     cache.invalidate("cache:shop:900201");
     cache.invalidate("cache:voucher-meta:900202");
     jdbc.update("DELETE FROM tb_voucher WHERE id=900202");
+    await(() -> metrics.get("hmdp.cdc.connected").gauge().value() == 1);
   }
 
   @Test
   void externalSqlInvalidatesAndWarmsCurrentValueInRedis() throws Exception {
-    await(() -> metrics.get("hmdp.cdc.connected").gauge().value() == 1);
     long id = 900201;
     String old = "cdc-old";
     String fresh = "cdc-new-" + System.nanoTime();
@@ -70,13 +167,13 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
             !before.equals(version(id))
                 && fresh.equals(read(id).getName())
                 && redis.opsForValue().get("cache:shop:" + id) != null);
-    // Warming happens before the batch audit commits; wait for the independent durable
-    // checkpoint.
+    // The durable checkpoint records the Debezium binlog position of the last applied batch.
     await(
         () ->
             jdbc.queryForObject(
                     "SELECT COUNT(*) FROM tb_cache_cdc_checkpoint WHERE "
-                        + "destination='example' AND binlog_offset>0",
+                        + "destination='hmdp-cache-cdc' AND binlog_offset>0 "
+                        + "AND binlog_file LIKE 'mysql-bin.%'",
                     Long.class)
                 > 0);
     CacheClient peer = new CacheClient(redis);
@@ -87,7 +184,7 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
               id,
               Shop.class,
               key -> {
-                fail("A new instance must hit shared warm data");
+                fail("A new instance must hit the warmed Redis value");
                 return null;
               },
               20L,
@@ -104,7 +201,6 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
 
   @Test
   void voucherMoveInvalidatesBothShopAggregates() throws Exception {
-    await(() -> metrics.get("hmdp.cdc.connected").gauge().value() == 1);
     long id = 900202;
     jdbc.update(
         "INSERT INTO "
@@ -129,21 +225,11 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  void clientReconnectResumesAndProcessesSubsequentChange() throws Exception {
-    await(() -> metrics.get("hmdp.cdc.connected").gauge().value() == 1);
-    CanalCacheConsumer consumer = context.getBean(CanalCacheConsumer.class);
-    CanalConnector previous = (CanalConnector) ReflectionTestUtils.getField(consumer, "active");
-    assertNotNull(previous);
-    previous.disconnect();
-    await(
-        () -> {
-          Object active = ReflectionTestUtils.getField(consumer, "active");
-          return active != null
-              && active != previous
-              && metrics.get("hmdp.cdc.connected").gauge().value() == 1;
-        });
+  void restartedConsumerResumesFromCommittedOffset() throws Exception {
+    consumer.stop();
     long id = 900203;
-    String name = "after-reconnect-" + System.nanoTime();
+    String name = "while-stopped-" + System.nanoTime();
+    // Committed while no consumer runs: the event must wait in Kafka, not be lost.
     jdbc.update(
         "INSERT INTO "
             + "tb_shop(id,name,type_id,images,area,address,x,y,"
@@ -151,6 +237,7 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
             + "1,1,1,1,1,50) ON DUPLICATE KEY UPDATE name=VALUES(name)",
         id,
         name);
+    consumer.start();
     await(
         () -> {
           String value = redis.opsForValue().get("cache:shop:" + id);
@@ -187,13 +274,13 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
   }
 
   private static void await(BooleanSupplier condition) throws Exception {
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
     while (System.nanoTime() < deadline) {
       if (condition.getAsBoolean()) {
         return;
       }
       Thread.sleep(100);
     }
-    assertTrue(condition.getAsBoolean(), "Real Canal CDC did not converge within 30 seconds");
+    fail("CDC condition not reached within 60 seconds");
   }
 }

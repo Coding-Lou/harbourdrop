@@ -14,6 +14,7 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MySQLContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.kafka.KafkaContainer;
 import org.testcontainers.lifecycle.Startables;
 import org.testcontainers.utility.DockerImageName;
@@ -34,9 +35,17 @@ public abstract class IntegrationTestBase {
 
   public static final String BEHAVIOR_TOPIC = "HmdpShopBehavior";
 
+  /** Shared network so Kafka Connect (CDC tests) can reach MySQL and Kafka by alias. */
+  protected static final Network NETWORK = Network.newNetwork();
+
+  /** Bootstrap address for containers on {@link #NETWORK}; the host uses getBootstrapServers(). */
+  protected static final String KAFKA_INTERNAL_BOOTSTRAP = "kafka:19092";
+
   @ServiceConnection
   protected static final MySQLContainer<?> MYSQL =
       new MySQLContainer<>(DockerImageName.parse("mysql:8.0"))
+          .withNetwork(NETWORK)
+          .withNetworkAliases("mysql")
           .withDatabaseName(DATABASE)
           .withUsername("root")
           .withPassword("isolation_test_only")
@@ -56,7 +65,10 @@ public abstract class IntegrationTestBase {
 
   @ServiceConnection
   protected static final KafkaContainer KAFKA =
-      new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"));
+      new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"))
+          .withNetwork(NETWORK)
+          .withNetworkAliases("kafka")
+          .withListener(KAFKA_INTERNAL_BOOTSTRAP);
 
   static {
     Startables.deepStart(MYSQL, REDIS, KAFKA).join();

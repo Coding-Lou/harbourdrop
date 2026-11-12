@@ -7,10 +7,6 @@ scrape_configs:
     bearer_token_file: /tmp/monitor-token
     static_configs:
       - targets: ['java:8081']
-  - job_name: canal
-    metrics_path: /metrics
-    static_configs:
-      - targets: ['canal:11112']
 rule_files:
   - /etc/prometheus/alerts.yml
 alerting:

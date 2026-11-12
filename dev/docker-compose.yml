@@ -51,7 +51,7 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
       - ../src/main/resources/db/hmdp.sql:/docker-entrypoint-initdb.d/01-hmdp.sql:ro
-      - ./mysql/02-canal.sql:/docker-entrypoint-initdb.d/02-canal.sql:ro
+      - ./mysql/02-debezium.sql:/docker-entrypoint-initdb.d/02-debezium.sql:ro
     healthcheck:
       test: [CMD-SHELL, 'mysqladmin ping -h 127.0.0.1 -p$$MYSQL_ROOT_PASSWORD --silent']
       interval: 5s
@@ -67,23 +67,58 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-  canal:
-    image: canal/canal-server:v1.1.8
-    platform: linux/amd64
-    pull_policy: if_not_present
+  cdc-user-init:
+    # Creates the Debezium account on existing MySQL volumes too (initdb scripts only run once).
+    image: mysql:8.0
+    entrypoint: [/bin/sh, -c]
+    command: ['mysql -h mysql -uroot -p"$$MYSQL_ROOT_PASSWORD" < /init/02-debezium.sql']
     environment:
-      canal.destinations: example
-      canal.auto.scan: 'false'
-      canal.instance.master.address: mysql:3306
-      canal.instance.dbUsername: canal
-      canal.instance.dbPassword: hmdp_canal_local_only
-      canal.instance.mysql.slaveId: '1234'
-      canal.instance.filter.regex: 'hmdp\.(tb_shop|tb_voucher|tb_seckill_voucher)'
-      canal.instance.tsdb.enable: 'true'
+      MYSQL_ROOT_PASSWORD: ${HMDP_MYSQL_PASSWORD:-hmdp_local_only}
     volumes:
-      - canal-meta:/home/admin/canal-server/conf/example
+      - ./mysql/02-debezium.sql:/init/02-debezium.sql:ro
     depends_on:
       mysql:
+        condition: service_healthy
+  connect:
+    image: quay.io/debezium/connect:3.7.1.Final
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: hmdp-connect
+      CONFIG_STORAGE_TOPIC: hmdp_connect_configs
+      OFFSET_STORAGE_TOPIC: hmdp_connect_offsets
+      STATUS_STORAGE_TOPIC: hmdp_connect_statuses
+      CONFIG_STORAGE_REPLICATION_FACTOR: '1'
+      OFFSET_STORAGE_REPLICATION_FACTOR: '1'
+      STATUS_STORAGE_REPLICATION_FACTOR: '1'
+      HEAP_OPTS: '-Xms256m -Xmx512m'
+    ports:
+      - '127.0.0.1:${HMDP_CONNECT_PORT:-8083}:8083'
+    depends_on:
+      kafka:
+        condition: service_healthy
+      cdc-user-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD-SHELL, 'curl -fs http://localhost:8083/connectors >/dev/null']
+      interval: 5s
+      timeout: 5s
+      retries: 60
+  connect-init:
+    # PUT is idempotent: creates the connector or updates its configuration.
+    image: curlimages/curl:8.11.1
+    command:
+      - -fsS
+      - -X
+      - PUT
+      - -H
+      - 'Content-Type: application/json'
+      - --data
+      - '@/config/hmdp-cache-connector.json'
+      - http://connect:8083/connectors/hmdp-cache/config
+    volumes:
+      - ./debezium/hmdp-cache-connector.json:/config/hmdp-cache-connector.json:ro
+    depends_on:
+      connect:
         condition: service_healthy
   java:
     image: maven:3.9-eclipse-temurin-21
@@ -97,7 +132,6 @@ services:
       SPRING_DATA_REDIS_PORT: '6379'
       SPRING_DATA_REDIS_PASSWORD: ''
       HMDP_CDC_ENABLED: 'true'
-      HMDP_CDC_HOST: canal
       HMDP_CDC_SCHEMA: hmdp
       HMDP_MQ_ENABLED: 'true'
       HMDP_MQ_SECKILL_ENABLED: 'true'
@@ -119,8 +153,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      canal:
-        condition: service_started
+      connect-init:
+        condition: service_completed_successfully
       kafka-init:
         condition: service_completed_successfully
   web:
@@ -158,7 +192,6 @@ services:
       - alertmanager-data:/alertmanager
 volumes:
   kafka-data:
-  canal-meta:
   prometheus-data:
   alertmanager-data:
   mysql-data:

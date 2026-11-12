@@ -1,7 +1,5 @@
 package com.hmdp.cache;
 
-import com.alibaba.otter.canal.protocol.CanalEntry;
-import com.google.protobuf.InvalidProtocolBufferException;
 import com.hmdp.entity.Shop;
 import com.hmdp.entity.Voucher;
 import com.hmdp.service.IShopService;
@@ -10,9 +8,7 @@ import com.hmdp.utils.CacheClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -49,39 +45,38 @@ public class CacheChangeProjector {
     this.metrics = metrics;
   }
 
-  public boolean isRelevantEntry(CanalEntry.Entry entry) {
-    return entry.getEntryType() == CanalEntry.EntryType.ROWDATA
-        && schema.equals(entry.getHeader().getSchemaName())
-        && WATCHED_TABLES.contains(entry.getHeader().getTableName());
+  public boolean isRelevant(String changeSchema, String table) {
+    return schema.equals(changeSchema) && WATCHED_TABLES.contains(table);
   }
 
   /**
    * 仅处理指定数据库和表的变更，失效相关元数据缓存并按需回源。
    *
-   * <p>活动执行库存和购买资格由秒杀流程维护，CDC 不用数据库快照覆盖 Redis 执行状态。
+   * <p>活动执行库存和购买资格由秒杀流程维护，CDC 不用数据库快照覆盖 Redis 执行状态。回源读取的是数据库当前值， 因此重放旧事件不会把旧内容写回缓存。
    */
-  public void projectEntryChanges(CanalEntry.Entry entry) throws InvalidProtocolBufferException {
-    log.debug(
-        "CDC entry: {} {}.{} type={}",
-        entry.getEntryType(),
-        entry.getHeader().getSchemaName(),
-        entry.getHeader().getTableName(),
-        entry.getHeader().getEventType());
-    if (!isRelevantEntry(entry)) {
+  public void projectRowChange(CdcRowChange change) {
+    log.debug("CDC row {}.{} op={}", change.schema(), change.table(), change.operation());
+    if (!isRelevant(change.schema(), change.table())) {
       return;
     }
-    String table = entry.getHeader().getTableName();
-    CanalEntry.RowChange change = CanalEntry.RowChange.parseFrom(entry.getStoreValue());
-    if (change.getIsDdl()) {
-      invalidateTableMetadata(table);
-      metrics.counter("hmdp.cdc.ddl", "table", table).increment();
+    Map<String, String> identity = change.after().isEmpty() ? change.before() : change.after();
+    if ("tb_shop".equals(change.table())) {
+      projectShopChange(parseRowId(identity, "id"), change.operation());
+    } else if ("tb_voucher".equals(change.table())) {
+      projectVoucherChange(
+          parseRowId(identity, "id"), change.operation(), change.before(), change.after());
+    }
+    // 活动库存与窗口实时查库；CDC 不覆盖 Redis 的执行库存或购买资格。
+    metrics.counter("hmdp.cdc.rows", "table", change.table()).increment();
+  }
+
+  /** A DDL statement may change how rows decode, so drop every cached entry of that table. */
+  public void projectSchemaChange(String changeSchema, String table) {
+    if (!isRelevant(changeSchema, table)) {
       return;
     }
-    log.debug("CDC row count={} event={}", change.getRowDatasCount(), change.getEventType());
-    for (CanalEntry.RowData row : change.getRowDatasList()) {
-      projectRow(table, change.getEventType(), row);
-      metrics.counter("hmdp.cdc.rows", "table", table).increment();
-    }
+    invalidateTableMetadata(table);
+    metrics.counter("hmdp.cdc.ddl", "table", table).increment();
   }
 
   private void invalidateTableMetadata(String table) {
@@ -94,21 +89,9 @@ public class CacheChangeProjector {
     }
   }
 
-  private void projectRow(String table, CanalEntry.EventType eventType, CanalEntry.RowData row) {
-    Map<String, String> before = mapColumnValues(row.getBeforeColumnsList());
-    Map<String, String> after = mapColumnValues(row.getAfterColumnsList());
-    Map<String, String> identity = after.isEmpty() ? before : after;
-    if ("tb_shop".equals(table)) {
-      projectShopChange(parseRowId(identity, "id"), eventType);
-    } else if ("tb_voucher".equals(table)) {
-      projectVoucherChange(parseRowId(identity, "id"), eventType, before, after);
-    }
-    // 活动库存与窗口实时查库；CDC 不覆盖 Redis 的执行库存或购买资格。
-  }
-
-  private void projectShopChange(long shopId, CanalEntry.EventType eventType) {
+  private void projectShopChange(long shopId, CdcRowChange.Operation operation) {
     cache.invalidate("cache:shop:" + shopId);
-    if (eventType != CanalEntry.EventType.DELETE) {
+    if (operation != CdcRowChange.Operation.DELETE) {
       cache.queryWithMutex(
           "cache:shop:",
           shopId,
@@ -121,7 +104,7 @@ public class CacheChangeProjector {
 
   private void projectVoucherChange(
       long voucherId,
-      CanalEntry.EventType eventType,
+      CdcRowChange.Operation operation,
       Map<String, String> before,
       Map<String, String> after) {
     cache.invalidate("cache:voucher-meta:" + voucherId);
@@ -133,7 +116,7 @@ public class CacheChangeProjector {
     for (String shopId : shopIds) {
       cache.invalidate("cache:voucher-list:" + Long.parseLong(shopId));
     }
-    if (eventType != CanalEntry.EventType.DELETE) {
+    if (operation != CdcRowChange.Operation.DELETE) {
       cache.queryWithMutex(
           "cache:voucher-meta:",
           voucherId,
@@ -142,16 +125,6 @@ public class CacheChangeProjector {
           VOUCHER_METADATA_TTL_MINUTES,
           TimeUnit.MINUTES);
     }
-  }
-
-  private static Map<String, String> mapColumnValues(List<CanalEntry.Column> columns) {
-    Map<String, String> result = new HashMap<>();
-    for (CanalEntry.Column column : columns) {
-      if (!column.getIsNull()) {
-        result.put(column.getName(), column.getValue());
-      }
-    }
-    return result;
   }
 
   private static long parseRowId(Map<String, String> row, String key) {
