@@ -104,6 +104,8 @@ public abstract class IntegrationTestBase {
     registry.add("citylens.payment.mock-enabled", () -> "true");
     registry.add("citylens.reliability.scheduling-enabled", () -> "false");
     registry.add("hmdp.monitor-token", () -> "hmdp_dev_metrics");
+    // Tests read login codes from Redis; allow the no-SMTP path instead of failing closed.
+    registry.add("hmdp.mail.log-codes", () -> "true");
   }
 
   protected static void createTopics(List<NewTopic> topics) {

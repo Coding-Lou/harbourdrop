@@ -106,6 +106,8 @@ hmdp:
     # Login codes are emailed when enabled (SMTP from SPRING_MAIL_HOST/PORT, e.g. Mailpit).
     enabled: ${HMDP_MAIL_ENABLED:false}
     from: ${HMDP_MAIL_FROM:no-reply@hmdp.local}
+    # Demo hosts without SMTP only: write codes to the log instead of failing. Never in production.
+    log-codes: ${HMDP_LOGIN_CODE_LOG:false}
   cache:
     enabled: true
   cdc:

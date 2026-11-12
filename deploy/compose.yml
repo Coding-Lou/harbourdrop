@@ -83,8 +83,11 @@ services:
       HMDP_EXPERIENCE_ENABLED: 'true'
       HMDP_MONITOR_TOKEN: ${HMDP_MONITOR_TOKEN:?Run init-env.sh first}
       HMDP_JWT_SECRET: ${HMDP_JWT_SECRET:?Run init-env.sh first}
-      # No SMTP on the small demo host: login codes go to the application log only.
+      # This small demo host has no SMTP. Codes are logged only because the operator opts in here;
+      # configure SPRING_MAIL_HOST and set HMDP_MAIL_ENABLED=true / HMDP_LOGIN_CODE_LOG=false instead
+      # for anything beyond a private demo.
       HMDP_MAIL_ENABLED: ${HMDP_MAIL_ENABLED:-false}
+      HMDP_LOGIN_CODE_LOG: ${HMDP_LOGIN_CODE_LOG:-true}
       HMDP_UPLOAD_DIR: /uploads
       CITYLENS_CATALOG_ADMIN_IDS: ${HMDP_ADMIN_IDS:-}
       CITYLENS_PAYMENT_MOCK_ENABLED: ${HMDP_PAYMENT_MOCK_ENABLED:-false}

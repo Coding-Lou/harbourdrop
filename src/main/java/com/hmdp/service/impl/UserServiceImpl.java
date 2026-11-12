@@ -89,7 +89,10 @@ public class UserServiceImpl implements IUserService {
     stringRedisTemplate
         .opsForValue()
         .set(LOGIN_CODE_KEY + email, code, LOGIN_CODE_TTL, TimeUnit.MINUTES);
-    loginCodeSender.send(email, code);
+    if (!loginCodeSender.send(email, code)) {
+      stringRedisTemplate.delete(LOGIN_CODE_KEY + email);
+      return Result.fail("验证码发送服务未配置");
+    }
     return Result.ok();
   }
 
