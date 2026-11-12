@@ -1,8 +1,8 @@
 package com.hmdp.service.impl;
 
 import com.hmdp.dto.Result;
-import com.hmdp.mapper.MediaMapper;
 import com.hmdp.reliability.MediaStorage;
+import com.hmdp.repository.MediaRepository;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.IMediaService;
 import com.hmdp.utils.SystemConstants;
@@ -29,7 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class MediaServiceImpl implements IMediaService {
 
   @Resource
-  private MediaMapper mediaMapper;
+  private MediaRepository mediaRepository;
 
   private final TransactionTemplate transactions;
   private final IBusinessOutboxService outbox;
@@ -57,7 +57,7 @@ public class MediaServiceImpl implements IMediaService {
     try {
       // All publishers lock paths in the same order; deletion locks the same owner row.
       for (String path : paths(images)) {
-        List<Map<String, Object>> rows = mediaMapper.selectOwnerForUpdate(path);
+        List<Map<String, Object>> rows = mediaRepository.selectOwnerForUpdate(path);
         if (rows.isEmpty()
             || ((Number) rows.get(0).get("user_id")).longValue() != user
             || !"ACTIVE".equals(rows.get(0).get("state"))) {
@@ -76,7 +76,7 @@ public class MediaServiceImpl implements IMediaService {
       throw new IllegalStateException("图片引用需要业务事务");
     }
     for (String path : paths(images)) {
-      mediaMapper.insertBlogReference(blog, path);
+      mediaRepository.insertBlogReference(blog, path);
     }
   }
 
@@ -90,17 +90,17 @@ public class MediaServiceImpl implements IMediaService {
     }
     return transactions.execute(
         tx -> {
-          List<Map<String, Object>> rows = mediaMapper.selectOwnerForUpdate(path);
+          List<Map<String, Object>> rows = mediaRepository.selectOwnerForUpdate(path);
           if (rows.isEmpty() || ((Number) rows.get(0).get("user_id")).longValue() != user) {
             return Result.fail("图片不存在或无权删除");
           }
           if (!"ACTIVE".equals(rows.get(0).get("state"))) {
             return Result.ok();
           }
-          if (!mediaMapper.selectReferencesForUpdate(path).isEmpty()) {
+          if (!mediaRepository.selectReferencesForUpdate(path).isEmpty()) {
             return Result.fail("图片已用于笔记，不能直接删除");
           }
-          mediaMapper.markDeleting(path);
+          mediaRepository.markDeleting(path);
           outbox.appendMediaDeletionEvent(path, user);
           return Result.ok();
         });
@@ -147,7 +147,7 @@ public class MediaServiceImpl implements IMediaService {
       String fileName = createNewFileName(lower);
       // 保存文件
       image.transferTo(new File(uploadDir, fileName));
-      mediaMapper.insertOwner(fileName, user);
+      mediaRepository.insertOwner(fileName, user);
       // 返回结果
       log.debug("文件上传成功，{}", fileName);
       return Result.ok(fileName);

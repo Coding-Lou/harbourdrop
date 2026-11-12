@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.entity.Voucher;
-import com.hmdp.mapper.MessageMapper;
-import com.hmdp.mapper.VoucherMapper;
+import com.hmdp.repository.MessageRepository;
+import com.hmdp.repository.VoucherRepository;
 import com.hmdp.support.IntegrationTestBase;
 import java.sql.Connection;
 import java.util.HashMap;
@@ -42,8 +42,8 @@ class ExperienceIntegrationTest extends IntegrationTestBase {
   @Autowired private ObjectMapper json;
   @Autowired private DataSource dataSource;
   @Autowired private StringRedisTemplate redis;
-  @Autowired private VoucherMapper vouchers;
-  @Autowired private MessageMapper messages;
+  @Autowired private VoucherRepository vouchers;
+  @Autowired private MessageRepository messages;
 
   @BeforeEach
   void guardIsolation() throws Exception {

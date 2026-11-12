@@ -1,8 +1,9 @@
 package com.hmdp.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Voucher;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * 服务类
@@ -10,7 +11,10 @@ import com.hmdp.entity.Voucher;
  * @author 虎哥
  * @since 2021-12-22
  */
-public interface IVoucherService extends IService<Voucher> {
+public interface IVoucherService {
+  Voucher getById(Long id);
+
+  List<Voucher> listByIds(Collection<Long> ids);
 
   Result queryVoucherOfShop(Long shopId);
 

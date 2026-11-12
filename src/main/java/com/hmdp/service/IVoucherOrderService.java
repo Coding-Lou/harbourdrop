@@ -1,6 +1,5 @@
 package com.hmdp.service;
 
-import com.baomidou.mybatisplus.extension.service.IService;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.VoucherOrder;
 
@@ -10,7 +9,8 @@ import com.hmdp.entity.VoucherOrder;
  * @author 虎哥
  * @since 2021-12-22
  */
-public interface IVoucherOrderService extends IService<VoucherOrder> {
+public interface IVoucherOrderService {
+  VoucherOrder getById(Long orderId);
 
   /** 条件扣库存与保存订单在同一事务内完成；用户锁覆盖事务提交。 */
   void persistSeckill(VoucherOrder order);

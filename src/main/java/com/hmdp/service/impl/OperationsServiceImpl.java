@@ -3,10 +3,10 @@ package com.hmdp.service.impl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.BusinessOutboxTask;
 import com.hmdp.enums.ReservationState;
-import com.hmdp.mapper.BehaviorMapper;
-import com.hmdp.mapper.BusinessOutboxMapper;
-import com.hmdp.mapper.MessageMapper;
-import com.hmdp.mapper.SeckillReservationMapper;
+import com.hmdp.repository.BehaviorRepository;
+import com.hmdp.repository.BusinessOutboxRepository;
+import com.hmdp.repository.MessageRepository;
+import com.hmdp.repository.SeckillReservationRepository;
 import com.hmdp.service.IOperationsService;
 import com.hmdp.service.ISeckillService;
 import jakarta.annotation.Resource;
@@ -16,16 +16,16 @@ import org.springframework.stereotype.Service;
 public class OperationsServiceImpl implements IOperationsService {
 
   @Resource
-  private BehaviorMapper behaviorMapper;
+  private BehaviorRepository behaviorRepository;
 
   @Resource
-  private BusinessOutboxMapper businessOutboxMapper;
+  private BusinessOutboxRepository businessOutboxRepository;
 
   @Resource
-  private MessageMapper messageMapper;
+  private MessageRepository messageRepository;
 
   @Resource
-  private SeckillReservationMapper seckillReservationMapper;
+  private SeckillReservationRepository seckillReservationRepository;
 
   @Resource
   private ISeckillService coordinator;
@@ -37,46 +37,48 @@ public class OperationsServiceImpl implements IOperationsService {
 
   @Override
   public Result querySeckillDeadLetters() {
-    return Result.ok(seckillReservationMapper.selectDeadLetters());
+    return Result.ok(seckillReservationRepository.selectDeadLetters());
   }
 
   @Override
   public Result queryUnfinishedBusinessEvents() {
-    return Result.ok(businessOutboxMapper.selectUnfinishedEvents());
+    return Result.ok(businessOutboxRepository.selectUnfinishedEvents());
   }
 
   @Override
   public Result retryBusinessEvent(long eventId) {
-    BusinessOutboxTask task = businessOutboxMapper.selectReviewEvent(eventId);
+    BusinessOutboxTask task = businessOutboxRepository.selectReviewEvent(eventId);
     if (task != null && "SECKILL_FULFILL".equals(task.getKind())) {
       long orderId = task.getAggregateId();
       if (ReservationState.REVIEW.matches(coordinator.queryReservationState(orderId))) {
         return coordinator.retryReservation(orderId);
       }
     }
-    return businessOutboxMapper.retryReviewEvent(eventId) > 0
+    return businessOutboxRepository.retryReviewEvent(eventId) > 0
         ? Result.ok()
         : Result.fail("任务不在待核对状态");
   }
 
   @Override
   public Result queryMessageFailures() {
-    return Result.ok(messageMapper.selectFailures());
+    return Result.ok(messageRepository.selectFailures());
   }
 
   @Override
   public Result queryUnsentAnalyticsEvents() {
-    return Result.ok(behaviorMapper.selectUnsentEvents());
+    return Result.ok(behaviorRepository.selectUnsentEvents());
   }
 
   @Override
   public Result queryAnalyticsFailures() {
-    return Result.ok(behaviorMapper.selectFailures());
+    return Result.ok(behaviorRepository.selectFailures());
   }
 
   @Override
   public Result retryAnalyticsEvent(String eventId) {
-    return behaviorMapper.retryReviewEvent(eventId) > 0 ? Result.ok() : Result.fail("事件不在待核对状态");
+    return behaviorRepository.retryReviewEvent(eventId) > 0
+        ? Result.ok()
+        : Result.fail("事件不在待核对状态");
   }
 
   @Override

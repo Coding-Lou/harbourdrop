@@ -4,8 +4,8 @@ import com.hmdp.cache.CacheReadTrace;
 import com.hmdp.cache.RequestCacheScope;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
-import com.hmdp.mapper.BehaviorMapper;
-import com.hmdp.mapper.MessageMapper;
+import com.hmdp.repository.BehaviorRepository;
+import com.hmdp.repository.MessageRepository;
 import com.hmdp.service.IBehaviorJournalService;
 import com.hmdp.service.IExperienceService;
 import com.hmdp.service.IShopService;
@@ -35,10 +35,10 @@ public class ExperienceServiceImpl implements IExperienceService {
   private IVoucherOrderService voucherOrderService;
 
   @Resource
-  private BehaviorMapper behaviorMapper;
+  private BehaviorRepository behaviorRepository;
 
   @Resource
-  private MessageMapper messageMapper;
+  private MessageRepository messageRepository;
 
   @Resource
   private MeterRegistry metrics;
@@ -168,7 +168,7 @@ public class ExperienceServiceImpl implements IExperienceService {
     }
     List<Map<String, Object>> receipts = new ArrayList<>();
     for (String id : eventIds) {
-      Map<String, Object> stored = behaviorMapper.selectEvent(id);
+      Map<String, Object> stored = behaviorRepository.selectEvent(id);
       Map<String, Object> receipt = new LinkedHashMap<>();
       receipt.put("eventId", id);
       receipt.put("state", stored == null ? "PENDING" : "PERSISTED");
@@ -192,6 +192,6 @@ public class ExperienceServiceImpl implements IExperienceService {
     if (!Boolean.TRUE.equals(owned.getSuccess())) {
       return owned;
     }
-    return Result.ok(messageMapper.selectOrderProgress(orderId, UserHolder.getUser().getId()));
+    return Result.ok(messageRepository.selectOrderProgress(orderId, UserHolder.getUser().getId()));
   }
 }

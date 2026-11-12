@@ -1,14 +1,18 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * @author 虎哥
@@ -17,13 +21,17 @@ import lombok.experimental.Accessors;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_voucher")
+@Entity
+@Table(name = "tb_voucher")
+@DynamicInsert
+@DynamicUpdate
 public class Voucher implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
   /** 主键 */
-  @TableId(value = "id", type = IdType.AUTO)
+  @Id
+  @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
 
   /** 商铺id */
@@ -51,20 +59,16 @@ public class Voucher implements Serializable {
   private Integer status;
 
   /** 库存 */
-  @TableField(exist = false)
-  private Integer stock;
+  @Transient private Integer stock;
 
   /** 生效时间 */
-  @TableField(exist = false)
-  private LocalDateTime beginTime;
+  @Transient private LocalDateTime beginTime;
 
   /** 失效时间 */
-  @TableField(exist = false)
-  private LocalDateTime endTime;
+  @Transient private LocalDateTime endTime;
 
   /** 是否可下单，由点评服务按自身时钟计算；仅用于响应，不入库。 */
-  @TableField(exist = false)
-  private Boolean orderable;
+  @Transient private Boolean orderable;
 
   /** 创建时间 */
   private LocalDateTime createTime;

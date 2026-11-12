@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.mapper.BehaviorMapper;
-import com.hmdp.mapper.MessageMapper;
+import com.hmdp.repository.BehaviorRepository;
+import com.hmdp.repository.MessageRepository;
 import com.hmdp.service.IBehaviorJournalService;
 import com.hmdp.service.IShopService;
 import com.hmdp.service.IVoucherOrderService;
@@ -30,8 +30,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class ExperienceServiceTest {
   private final ExperienceServiceImpl service = new ExperienceServiceImpl();
-  private final BehaviorMapper behavior = mock(BehaviorMapper.class);
-  private final MessageMapper messages = mock(MessageMapper.class);
+  private final BehaviorRepository behavior = mock(BehaviorRepository.class);
+  private final MessageRepository messages = mock(MessageRepository.class);
   private final IShopService shops = mock(IShopService.class);
   private final IBehaviorJournalService journal = mock(IBehaviorJournalService.class);
   private final IVoucherOrderService orders = mock(IVoucherOrderService.class);
@@ -39,8 +39,8 @@ class ExperienceServiceTest {
 
   @BeforeEach
   void prepare() {
-    ReflectionTestUtils.setField(service, "behaviorMapper", behavior);
-    ReflectionTestUtils.setField(service, "messageMapper", messages);
+    ReflectionTestUtils.setField(service, "behaviorRepository", behavior);
+    ReflectionTestUtils.setField(service, "messageRepository", messages);
     ReflectionTestUtils.setField(service, "shopService", shops);
     ReflectionTestUtils.setField(service, "behaviorJournalService", journal);
     ReflectionTestUtils.setField(service, "voucherOrderService", orders);

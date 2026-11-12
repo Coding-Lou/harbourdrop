@@ -16,8 +16,8 @@ import static org.mockito.Mockito.verify;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.BusinessOutboxTask;
-import com.hmdp.mapper.BusinessOutboxMapper;
 import com.hmdp.reliability.OrderMaintenance;
+import com.hmdp.repository.BusinessOutboxRepository;
 import com.hmdp.service.impl.BusinessEventServiceImpl;
 import com.hmdp.service.impl.BusinessOutboxServiceImpl;
 import com.hmdp.service.impl.OrderLifecycleServiceImpl;
@@ -51,7 +51,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 class MessagingIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired StringRedisTemplate redis;
-  @Autowired BusinessOutboxMapper businessOutboxMapper;
+  @Autowired BusinessOutboxRepository businessOutboxRepository;
   @Autowired TransactionTemplate transactions;
   @Autowired BusinessOutboxServiceImpl outbox;
   @Autowired OutboxRelayServiceImpl relay;
@@ -99,7 +99,7 @@ class MessagingIntegrationTest extends IntegrationTestBase {
   }
 
   private BusinessEvent event(long id) {
-    return BusinessEvent.from(businessOutboxMapper.selectEventById(id));
+    return BusinessEvent.from(businessOutboxRepository.selectEventById(id));
   }
 
   private String state(long id) {
@@ -179,7 +179,7 @@ class MessagingIntegrationTest extends IntegrationTestBase {
       long continuationId =
           jdbc.queryForObject("SELECT MAX(id) FROM tb_business_outbox", Long.class);
       assertTrue(continuationId > eventId);
-      BusinessOutboxTask continuation = businessOutboxMapper.selectEventById(continuationId);
+      BusinessOutboxTask continuation = businessOutboxRepository.selectEventById(continuationId);
       assertTrue(continuation.getCursorId() > 0);
       assertEquals(USER, continuation.getUserId().longValue());
       assertEquals(firstBatch.getOccurredAt(), continuation.getCreatedAt().getTime());

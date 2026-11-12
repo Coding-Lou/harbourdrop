@@ -1,13 +1,15 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * @author 虎哥
@@ -16,14 +18,16 @@ import lombok.experimental.Accessors;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_voucher_order")
+@Entity
+@Table(name = "tb_voucher_order")
+@DynamicInsert
+@DynamicUpdate
 public class VoucherOrder implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
   /** 主键 */
-  @TableId(value = "id", type = IdType.INPUT)
-  private Long id;
+  @Id private Long id;
 
   /** 下单的用户id */
   private Long userId;

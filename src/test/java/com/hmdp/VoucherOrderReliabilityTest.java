@@ -13,23 +13,20 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
-import com.baomidou.mybatisplus.extension.conditions.query.QueryChainWrapper;
-import com.baomidou.mybatisplus.extension.conditions.update.UpdateChainWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.Voucher;
 import com.hmdp.entity.VoucherOrder;
+import com.hmdp.repository.VoucherOrderRepository;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
-import com.hmdp.support.ChainMocks;
 import com.hmdp.utils.UserHolder;
-import java.io.Serializable;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
@@ -38,33 +35,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 class VoucherOrderReliabilityTest {
   static class Service extends VoucherOrderServiceImpl {
     VoucherOrder existing;
-    boolean saveResult = true;
+    VoucherOrderRepository orders = mock(VoucherOrderRepository.class);
 
-    @SuppressWarnings("unchecked")
-    QueryChainWrapper<VoucherOrder> candidates = ChainMocks.fluent(QueryChainWrapper.class);
-
-    @SuppressWarnings("unchecked")
-    LambdaQueryChainWrapper<VoucherOrder> personal =
-        ChainMocks.fluent(LambdaQueryChainWrapper.class);
+    Service() {
+      ReflectionTestUtils.setField(this, "voucherOrderRepository", orders);
+    }
 
     @Override
-    public VoucherOrder getById(Serializable id) {
+    public VoucherOrder getById(Long id) {
       return existing;
-    }
-
-    @Override
-    public QueryChainWrapper<VoucherOrder> query() {
-      return candidates;
-    }
-
-    @Override
-    public LambdaQueryChainWrapper<VoucherOrder> lambdaQuery() {
-      return personal;
-    }
-
-    @Override
-    public boolean save(VoucherOrder order) {
-      return saveResult;
     }
 
     void consume(VoucherOrder order) {
@@ -81,9 +60,7 @@ class VoucherOrderReliabilityTest {
     RedissonClient redis = mock(RedissonClient.class);
     when(redis.getLock(anyString())).thenReturn(lock);
     ISeckillVoucherService stock = mock(ISeckillVoucherService.class);
-    UpdateChainWrapper<SeckillVoucher> update = ChainMocks.fluent(UpdateChainWrapper.class);
-    when(stock.update()).thenReturn(update);
-    when(update.update()).thenReturn(true);
+    when(stock.deductStock(9L)).thenReturn(true);
     IVoucherService vouchers = mock(IVoucherService.class);
     when(vouchers.getById(9L)).thenReturn(new Voucher().setId(9L).setPayValue(0L));
     PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
@@ -94,8 +71,9 @@ class VoucherOrderReliabilityTest {
     ReflectionTestUtils.setField(service, "voucherService", vouchers);
     ReflectionTestUtils.setField(service, "transactionTemplate", new TransactionTemplate(manager));
     VoucherOrder order = new VoucherOrder().setId(88L).setUserId(7L).setVoucherId(9L);
-    service.saveResult = false;
-    assertThrows(IllegalStateException.class, () -> service.consume(order));
+    when(service.orders.insert(any()))
+        .thenThrow(new DataIntegrityViolationException("simulated insert failure"));
+    assertThrows(DataIntegrityViolationException.class, () -> service.consume(order));
     verify(manager).rollback(status);
     verify(lock).unlock();
     reset(stock, manager);
@@ -126,11 +104,13 @@ class VoucherOrderReliabilityTest {
     UserDTO user = new UserDTO();
     user.setId(7L);
     UserHolder.saveUser(user);
-    when(service.personal.page(any(Page.class))).thenReturn(new Page<VoucherOrder>(1, 20, 0));
+    when(service.orders.findByUserIdAndStatus(eq(7L), eq(2), any(Pageable.class)))
+        .thenReturn(Page.empty());
     try {
       assertTrue(service.queryMyOrders(1, true).getSuccess());
-      verify(service.personal).eq(any(), eq(7L));
-      verify(service.personal).eq(any(), eq(2));
+      // Owner comes from the session and "held" means PAID (status 2).
+      verify(service.orders).findByUserIdAndStatus(eq(7L), eq(2), any(Pageable.class));
+      verify(service.orders, never()).findByUserId(any(), any());
       assertFalse(service.queryMyOrders(0, false).getSuccess());
     } finally {
       UserHolder.removeUser();

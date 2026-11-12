@@ -1,10 +1,10 @@
 package com.hmdp.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.UserInfo;
-import com.hmdp.mapper.UserInfoMapper;
+import com.hmdp.repository.UserInfoRepository;
 import com.hmdp.service.IUserInfoService;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 /**
@@ -14,12 +14,13 @@ import org.springframework.stereotype.Service;
  * @since 2021-12-24
  */
 @Service
-public class UserInfoServiceImpl extends ServiceImpl<UserInfoMapper, UserInfo>
-    implements IUserInfoService {
+public class UserInfoServiceImpl implements IUserInfoService {
+  @Resource
+  private UserInfoRepository userInfoRepository;
 
   @Override
   public Result queryUserInfo(Long userId) {
-    UserInfo info = getById(userId);
+    UserInfo info = userId == null ? null : userInfoRepository.findById(userId).orElse(null);
     if (info == null) {
       return Result.ok();
     }

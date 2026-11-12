@@ -1,10 +1,8 @@
 package com.hmdp.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
-import com.hmdp.entity.Follow;
-import com.hmdp.mapper.FollowMapper;
+import com.hmdp.repository.FollowRepository;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
@@ -23,7 +21,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * @since 2021-12-22
  */
 @Service
-public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> implements IFollowService {
+public class FollowServiceImpl implements IFollowService {
+  @Resource
+  private FollowRepository followRepository;
 
   @Resource
   private IUserService userService;
@@ -44,8 +44,8 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
         tx -> {
           int changed =
               Boolean.TRUE.equals(enabled)
-                  ? baseMapper.insertEdge(user, target)
-                  : baseMapper.deleteEdge(user, target);
+                  ? followRepository.insertEdge(user, target)
+                  : followRepository.deleteEdge(user, target);
           if (changed > 0) {
             outbox.appendBusinessEvent("FOLLOW", target, user);
           }
@@ -55,12 +55,12 @@ public class FollowServiceImpl extends ServiceImpl<FollowMapper, Follow> impleme
 
   @Override
   public Result isFollow(Long target) {
-    return Result.ok(baseMapper.countEdge(UserHolder.getUser().getId(), target) > 0);
+    return Result.ok(followRepository.countEdge(UserHolder.getUser().getId(), target) > 0);
   }
 
   @Override
   public Result followCommons(Long other) {
-    List<Long> ids = baseMapper.selectCommonFollowIds(UserHolder.getUser().getId(), other);
+    List<Long> ids = followRepository.selectCommonFollowIds(UserHolder.getUser().getId(), other);
     if (ids.isEmpty()) {
       return Result.ok(Collections.emptyList());
     }

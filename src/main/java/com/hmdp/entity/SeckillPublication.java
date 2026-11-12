@@ -1,6 +1,8 @@
 package com.hmdp.entity;
 
+import com.hmdp.repository.Rows;
 import java.sql.Timestamp;
+import java.util.Map;
 import lombok.Data;
 
 /** 活动发布所需的当前库存、时间窗口和上架状态。 */
@@ -11,4 +13,17 @@ public class SeckillPublication {
   private Timestamp beginTime;
   private Timestamp endTime;
   private Integer status;
+
+  public static SeckillPublication fromRow(Map<String, Object> row) {
+    if (row == null) {
+      return null;
+    }
+    SeckillPublication publication = new SeckillPublication();
+    publication.setVoucherId(Rows.longOf(row, "voucher_id"));
+    publication.setStock(Rows.intOf(row, "stock"));
+    publication.setBeginTime(Rows.timestampOf(row, "begin_time"));
+    publication.setEndTime(Rows.timestampOf(row, "end_time"));
+    publication.setStatus(Rows.intOf(row, "status"));
+    return publication;
+  }
 }

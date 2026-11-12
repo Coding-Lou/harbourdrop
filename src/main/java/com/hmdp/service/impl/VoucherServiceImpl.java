@@ -1,12 +1,11 @@
 package com.hmdp.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.cache.VoucherCatalog;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.Voucher;
-import com.hmdp.mapper.SeckillVoucherMapper;
-import com.hmdp.mapper.VoucherMapper;
+import com.hmdp.repository.SeckillVoucherRepository;
+import com.hmdp.repository.VoucherRepository;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IShopService;
@@ -18,6 +17,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,11 +35,22 @@ import org.springframework.transaction.annotation.Transactional;
  * @since 2021-12-22
  */
 @Service
-public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
-    implements IVoucherService {
+public class VoucherServiceImpl implements IVoucherService {
+  @Resource
+  private VoucherRepository voucherRepository;
+
+  @Override
+  public Voucher getById(Long id) {
+    return id == null ? null : voucherRepository.findById(id).orElse(null);
+  }
+
+  @Override
+  public List<Voucher> listByIds(Collection<Long> ids) {
+    return voucherRepository.findAllById(ids);
+  }
 
   @Resource
-  private SeckillVoucherMapper seckillVoucherMapper;
+  private SeckillVoucherRepository seckillVoucherRepository;
 
   @Resource
   private ISeckillVoucherService seckillVoucherService;
@@ -62,7 +73,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
             VoucherCatalog.class,
             id -> {
               VoucherCatalog value = new VoucherCatalog();
-              value.setIds(baseMapper.selectActiveVoucherIds(id));
+              value.setIds(voucherRepository.selectActiveVoucherIds(id));
               return value;
             },
             10L,
@@ -112,7 +123,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
   @Transactional
   public void addSeckillVoucher(Voucher voucher) {
     // 保存优惠券
-    save(voucher);
+    voucherRepository.insert(voucher);
     // 保存秒杀信息
     SeckillVoucher seckillVoucher = new SeckillVoucher();
     seckillVoucher.setVoucherId(voucher.getId());
@@ -120,7 +131,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
     seckillVoucher.setBeginTime(voucher.getBeginTime());
     seckillVoucher.setEndTime(voucher.getEndTime());
     seckillVoucherService.save(seckillVoucher);
-    seckillVoucherMapper.insertActivity(voucher.getId(), voucher.getStock());
+    seckillVoucherRepository.insertActivity(voucher.getId(), voucher.getStock());
     outbox.appendBusinessEvent("SECKILL_PUBLISH", voucher.getId(), null);
   }
 
@@ -210,9 +221,7 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher>
     if (error != null) {
       return Result.fail(error);
     }
-    if (!save(voucher)) {
-      return Result.fail("保存失败");
-    }
+    voucherRepository.insert(voucher);
     return Result.ok(voucher.getId());
   }
 }

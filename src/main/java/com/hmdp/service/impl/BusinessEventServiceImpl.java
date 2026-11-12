@@ -2,13 +2,13 @@ package com.hmdp.service.impl;
 
 import com.hmdp.entity.BusinessOutboxTask;
 import com.hmdp.enums.OutboxState;
-import com.hmdp.mapper.BusinessOutboxMapper;
-import com.hmdp.mapper.MessageMapper;
-import com.hmdp.mapper.SeckillReservationMapper;
 import com.hmdp.messaging.BusinessEvent;
 import com.hmdp.messaging.BusinessEventType;
 import com.hmdp.messaging.DeliveryRetryPolicy;
 import com.hmdp.messaging.ProjectionResult;
+import com.hmdp.repository.BusinessOutboxRepository;
+import com.hmdp.repository.MessageRepository;
+import com.hmdp.repository.SeckillReservationRepository;
 import com.hmdp.service.IBusinessEventService;
 import com.hmdp.service.IBusinessProjectionService;
 import com.hmdp.utils.FailureMessages;
@@ -24,13 +24,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class BusinessEventServiceImpl implements IBusinessEventService {
 
   @Resource
-  private BusinessOutboxMapper businessOutboxMapper;
+  private BusinessOutboxRepository businessOutboxRepository;
 
   @Resource
-  private MessageMapper messageMapper;
+  private MessageRepository messageRepository;
 
   @Resource
-  private SeckillReservationMapper seckillReservationMapper;
+  private SeckillReservationRepository seckillReservationRepository;
 
   private final TransactionTemplate transactions;
   private final IBusinessProjectionService projector;
@@ -74,7 +74,7 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
 
   private void consumeLockedTask(BusinessEvent event, String group) {
     // 只锁当前事件；业务效果、Inbox 和任务完成状态仍在同一事务提交。
-    BusinessOutboxTask task = businessOutboxMapper.selectEventForUpdate(event.getEventId());
+    BusinessOutboxTask task = businessOutboxRepository.selectEventForUpdate(event.getEventId());
     if (task == null) {
       throw new IllegalArgumentException("消息没有对应的持久化事件");
     }
@@ -82,8 +82,8 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
         || event.getAggregateId() != task.getAggregateId()) {
       throw new IllegalArgumentException("消息内容与持久化事件不一致");
     }
-    if (messageMapper.countInboxEvent(group, event.getEventId()) > 0) {
-      businessOutboxMapper.markDuplicateDone(event.getEventId());
+    if (messageRepository.countInboxEvent(group, event.getEventId()) > 0) {
+      businessOutboxRepository.markDuplicateDone(event.getEventId());
       metrics.counter("hmdp.mq.consumptions", "group", group, "result", "duplicate").increment();
       return;
     }
@@ -93,15 +93,15 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
     if (projector.project(task) == ProjectionResult.CONTINUE) {
       appendFeedContinuation(task);
     }
-    messageMapper.insertInboxEvent(group, event.getEventId());
-    businessOutboxMapper.markConsumed(event.getEventId());
+    messageRepository.insertInboxEvent(group, event.getEventId());
+    businessOutboxRepository.markConsumed(event.getEventId());
     metrics.counter("hmdp.mq.consumptions", "group", group, "result", "success").increment();
   }
 
   private void appendFeedContinuation(BusinessOutboxTask task) {
     // 游标由当前批次推进；后续批次独立持久化，沿用原发布时间。
-    long cursor = businessOutboxMapper.selectCursor(task.getId());
-    businessOutboxMapper.insertFeedContinuation(
+    long cursor = businessOutboxRepository.selectCursor(task.getId());
+    businessOutboxRepository.insertFeedContinuation(
         task.getKind(), task.getAggregateId(), task.getUserId(), cursor, task.getCreatedAt());
   }
 
@@ -125,7 +125,7 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
               boolean valid = false;
               if (event != null && event.getEventId() > 0) {
                 BusinessOutboxTask task =
-                    businessOutboxMapper.selectEventForUpdate(event.getEventId());
+                    businessOutboxRepository.selectEventForUpdate(event.getEventId());
                 if (task != null) {
                   try {
                     valid =
@@ -140,7 +140,7 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
                     return true;
                   }
                   if (valid) {
-                    businessOutboxMapper.recordConsumeFailure(
+                    businessOutboxRepository.recordConsumeFailure(
                         FailureMessages.summarize(failure), event.getEventId());
                   }
                 }
@@ -149,7 +149,7 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
                 return false;
               }
               String key = valid ? "outbox:" + event.getEventId() : "broker:" + brokerId;
-              messageMapper.insertFailure(
+              messageRepository.insertFailure(
                   group,
                   key,
                   valid ? event.getEventId() : null,
@@ -157,13 +157,13 @@ public class BusinessEventServiceImpl implements IBusinessEventService {
                   payload,
                   FailureMessages.summarize(failure));
               if (valid) {
-                businessOutboxMapper.markReview(event.getEventId());
+                businessOutboxRepository.markReview(event.getEventId());
               }
               if (valid && "SECKILL_FULFILL".equals(event.getKind())) {
-                if (seckillReservationMapper.markProcessingForReview(
+                if (seckillReservationRepository.markProcessingForReview(
                         FailureMessages.summarize(failure), event.getAggregateId())
                     > 0) {
-                  seckillReservationMapper.insertDeadLetter(
+                  seckillReservationRepository.insertDeadLetter(
                       "mq:outbox:" + event.getEventId(),
                       event.getAggregateId(),
                       payload,

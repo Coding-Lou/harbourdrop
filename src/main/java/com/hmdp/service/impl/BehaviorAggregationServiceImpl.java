@@ -1,7 +1,7 @@
 package com.hmdp.service.impl;
 
 import com.hmdp.analytics.BehaviorEvent;
-import com.hmdp.mapper.BehaviorMapper;
+import com.hmdp.repository.BehaviorRepository;
 import com.hmdp.service.IBehaviorAggregationService;
 import jakarta.annotation.Resource;
 import java.util.List;
@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class BehaviorAggregationServiceImpl implements IBehaviorAggregationService {
 
   @Resource
-  private BehaviorMapper behaviorMapper;
+  private BehaviorRepository behaviorRepository;
 
   private final TransactionTemplate transactions;
 
@@ -28,7 +28,7 @@ public class BehaviorAggregationServiceImpl implements IBehaviorAggregationServi
     transactions.execute(
         tx -> {
           long bucket = event.getOccurredAt() / 60000 * 60000;
-          if (behaviorMapper.insertEvent(
+          if (behaviorRepository.insertEvent(
                   event.getEventId(),
                   event.getShopId(),
                   event.getUserId(),
@@ -36,7 +36,7 @@ public class BehaviorAggregationServiceImpl implements IBehaviorAggregationServi
                   event.getOccurredAt(),
                   bucket)
               == 0) {
-            Map<String, Object> old = behaviorMapper.selectEvent(event.getEventId());
+            Map<String, Object> old = behaviorRepository.selectEvent(event.getEventId());
             if (((Number) old.get("shop_id")).longValue() != event.getShopId()
                 || !Objects.equals(old.get("action"), event.getAction())
                 || !Objects.equals(old.get("user_id"), event.getUserId())
@@ -45,14 +45,14 @@ public class BehaviorAggregationServiceImpl implements IBehaviorAggregationServi
             }
             return null;
           }
-          behaviorMapper.accumulateBucket(
+          behaviorRepository.accumulateBucket(
               event.getShopId(),
               bucket,
               "VISIT".equals(event.getAction()) ? 1 : 0,
               "ORDER".equals(event.getAction()) ? 1 : 0,
               "PAID".equals(event.getAction()) ? 1 : 0);
           if ("VISIT".equals(event.getAction()) && event.getUserId() != null) {
-            behaviorMapper.insertVisitUser(event.getShopId(), event.getUserId(), bucket);
+            behaviorRepository.insertVisitUser(event.getShopId(), event.getUserId(), bucket);
           }
           return null;
         });
@@ -67,6 +67,6 @@ public class BehaviorAggregationServiceImpl implements IBehaviorAggregationServi
     long from = now - (minutes - 1L) * 60000;
     // COUNT DISTINCT over the entire window avoids adding per-minute UVs and over-counting
     // repeat visitors.
-    return behaviorMapper.selectRanking(from, now, from, now, limit);
+    return behaviorRepository.selectRanking(from, now, from, now, limit);
   }
 }

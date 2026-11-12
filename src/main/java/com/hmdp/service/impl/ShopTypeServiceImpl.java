@@ -1,11 +1,12 @@
 package com.hmdp.service.impl;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.ShopType;
-import com.hmdp.mapper.ShopTypeMapper;
+import com.hmdp.repository.ShopTypeRepository;
 import com.hmdp.service.IShopTypeService;
+import jakarta.annotation.Resource;
 import java.util.List;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 /**
@@ -15,12 +16,13 @@ import org.springframework.stereotype.Service;
  * @since 2021-12-22
  */
 @Service
-public class ShopTypeServiceImpl extends ServiceImpl<ShopTypeMapper, ShopType>
-    implements IShopTypeService {
+public class ShopTypeServiceImpl implements IShopTypeService {
+  @Resource
+  private ShopTypeRepository shopTypeRepository;
 
   @Override
   public Result queryTypeList() {
-    List<ShopType> typeList = query().orderByAsc("sort").list();
+    List<ShopType> typeList = shopTypeRepository.findAll(Sort.by("sort"));
     return Result.ok(typeList);
   }
 }

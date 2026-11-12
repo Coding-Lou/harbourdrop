@@ -5,9 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.analytics.BehaviorEvent;
 import com.hmdp.analytics.KafkaBehaviorTransport;
 import com.hmdp.entity.BusinessOutboxTask;
-import com.hmdp.mapper.BehaviorMapper;
-import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.messaging.DeliveryRetryPolicy;
+import com.hmdp.repository.BehaviorRepository;
+import com.hmdp.repository.VoucherOrderRepository;
 import com.hmdp.service.IBehaviorJournalService;
 import com.hmdp.utils.FailureMessages;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,10 +28,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
 
   @Resource
-  private BehaviorMapper behaviorMapper;
+  private BehaviorRepository behaviorRepository;
 
   @Resource
-  private VoucherOrderMapper voucherOrderMapper;
+  private VoucherOrderRepository voucherOrderRepository;
 
   private final ObjectMapper json;
   private final TransactionTemplate transactions;
@@ -71,7 +71,7 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
       throw new IllegalStateException("订单分析事件需要业务事务");
     }
     List<Map<String, Object>> rows =
-        voucherOrderMapper.selectBehaviorSnapshot(source.getAggregateId());
+        voucherOrderRepository.selectBehaviorSnapshot(source.getAggregateId());
     if (rows.isEmpty() || rows.get(0).get("shop_id_snapshot") == null) {
       return;
     }
@@ -84,7 +84,7 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
             "ORDER_PAID".equals(source.getKind()) ? "PAID" : "ORDER",
             source.getCreatedAt().getTime());
     try {
-      behaviorMapper.insertOutboxEvent(
+      behaviorRepository.insertOutboxEvent(
           event.getEventId(), event.getShopId(), json.writeValueAsString(event));
     } catch (JsonProcessingException bad) {
       throw new IllegalArgumentException("订单分析事件编码失败", bad);
@@ -131,25 +131,25 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
     List<Map<String, Object>> rows =
         transactions.execute(
             tx -> {
-              List<Map<String, Object>> batch = behaviorMapper.selectClaimableEvents();
+              List<Map<String, Object>> batch = behaviorRepository.selectClaimableEvents();
               for (Map<String, Object> row : batch) {
-                behaviorMapper.claimEvent(owner, (String) row.get("event_id"));
+                behaviorRepository.claimEvent(owner, (String) row.get("event_id"));
               }
               return batch;
             });
     for (Map<String, Object> row : rows) {
       try {
-        if (behaviorMapper.renewLease((String) row.get("event_id"), owner) == 0) {
+        if (behaviorRepository.renewLease((String) row.get("event_id"), owner) == 0) {
           continue;
         }
         transport
             .getObject()
             .publishAndAwaitAcknowledgement(
                 json.readValue(row.get("payload").toString(), BehaviorEvent.class));
-        behaviorMapper.markSent((String) row.get("event_id"), owner);
+        behaviorRepository.markSent((String) row.get("event_id"), owner);
       } catch (Exception failure) {
         int attempts = ((Number) row.get("attempts")).intValue() + 1;
-        behaviorMapper.recordSendFailure(
+        behaviorRepository.recordSendFailure(
             attempts >= DeliveryRetryPolicy.MAX_SEND_ATTEMPTS ? "REVIEW" : "PENDING",
             attempts,
             FailureMessages.summarize(failure),
@@ -166,7 +166,7 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
     if (!enabled) {
       return;
     }
-    behaviorMapper.redriveMissingEvents();
+    behaviorRepository.redriveMissingEvents();
   }
 
   @Scheduled(fixedDelay = 10000)
@@ -175,7 +175,7 @@ public class BehaviorJournalServiceImpl implements IBehaviorJournalService {
     if (!enabled) {
       return;
     }
-    pending.set(behaviorMapper.countPendingEvents());
-    review.set(behaviorMapper.countReviewEvents());
+    pending.set(behaviorRepository.countPendingEvents());
+    review.set(behaviorRepository.countReviewEvents());
   }
 }

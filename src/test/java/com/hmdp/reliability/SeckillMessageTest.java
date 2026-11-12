@@ -7,7 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
-import com.hmdp.mapper.SeckillReservationMapper;
+import com.hmdp.repository.SeckillReservationRepository;
 import com.hmdp.service.IVoucherOrderService;
 import com.hmdp.service.impl.SeckillServiceImpl;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -27,7 +27,7 @@ class SeckillMessageTest {
   @Test
   @SuppressWarnings("unchecked")
   void registrationOutageDoesNotAcknowledgeOrQuarantineAnUnregisteredRequest() {
-    SeckillReservationMapper reservations = mock(SeckillReservationMapper.class);
+    SeckillReservationRepository reservations = mock(SeckillReservationRepository.class);
     doThrow(new DataAccessResourceFailureException("database unavailable"))
         .when(reservations)
         .insertReservation(anyLong(), anyLong(), anyLong());
@@ -40,7 +40,7 @@ class SeckillMessageTest {
             mock(RedissonClient.class),
             orders,
             new SimpleMeterRegistry());
-    ReflectionTestUtils.setField(worker, "seckillReservationMapper", reservations);
+    ReflectionTestUtils.setField(worker, "seckillReservationRepository", reservations);
     Map<Object, Object> payload = new HashMap<>();
     payload.put("id", "123");
     payload.put("voucherId", "456");

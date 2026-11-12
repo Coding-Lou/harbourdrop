@@ -1,6 +1,6 @@
 package com.hmdp.service.impl;
 
-import com.hmdp.mapper.BusinessOutboxMapper;
+import com.hmdp.repository.BusinessOutboxRepository;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.IOutboxRelayService;
 import com.hmdp.utils.CacheClient;
@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
 
   @Resource
-  private BusinessOutboxMapper businessOutboxMapper;
+  private BusinessOutboxRepository businessOutboxRepository;
 
   @Resource
   private ObjectProvider<IOutboxRelayService> relay;
@@ -34,7 +34,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new IllegalStateException("Outbox 必须与业务写入同事务");
     }
-    businessOutboxMapper.insertEvent(kind, aggregateId, userId);
+    businessOutboxRepository.insertEvent(kind, aggregateId, userId);
   }
 
   @Override
@@ -42,7 +42,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new IllegalStateException("图片删除事件需要业务事务");
     }
-    businessOutboxMapper.insertMediaDeletion(userId, userId, path);
+    businessOutboxRepository.insertMediaDeletion(userId, userId, path);
   }
 
   @Override
@@ -66,7 +66,7 @@ public class BusinessOutboxServiceImpl implements IBusinessOutboxService {
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new IllegalStateException("订单截止时间事件需要业务事务");
     }
-    businessOutboxMapper.insertDeadline(orderId, userId, deadline);
+    businessOutboxRepository.insertDeadline(orderId, userId, deadline);
   }
 
   @Scheduled(fixedDelay = 1000)

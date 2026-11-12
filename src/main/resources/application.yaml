@@ -23,6 +23,11 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway owns the schema; Hibernate never creates or alters tables.
+      ddl-auto: none
   flyway:
     baseline-on-migrate: true
     baseline-version: 0
@@ -41,8 +46,6 @@ spring:
       auto-offset-reset: earliest
       enable-auto-commit: false
       max-poll-records: 20
-mybatis-plus:
-  type-aliases-package: com.hmdp.entity # 别名扫描包
 logging:
   level:
     com.hmdp: debug

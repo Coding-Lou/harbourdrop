@@ -1,15 +1,12 @@
 package com.hmdp.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
 import com.hmdp.entity.User;
-import com.hmdp.mapper.BlogMapper;
-import com.hmdp.mapper.ShopMapper;
+import com.hmdp.repository.BlogRepository;
+import com.hmdp.repository.ShopRepository;
 import com.hmdp.service.IBlogService;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.IFollowService;
@@ -21,17 +18,21 @@ import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.util.StringUtils;
 
 /**
  * 服务实现类
@@ -40,10 +41,36 @@ import org.springframework.util.StringUtils;
  * @since 2021-12-22
  */
 @Service
-public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
+public class BlogServiceImpl implements IBlogService {
+  @Resource
+  private BlogRepository blogRepository;
+
+  private Blog getById(Long id) {
+    return id == null ? null : blogRepository.findById(id).orElse(null);
+  }
+
+  private static PageRequest pageOf(Integer current, int size, Sort sort) {
+    return PageRequest.of(Math.max(1, current == null ? 1 : current) - 1, size, sort);
+  }
+
+  /** Returns rows in the order of {@code ids}; replaces SQL {@code ORDER BY FIELD(...)}. */
+  private static <T> List<T> inIdOrder(List<Long> ids, List<T> rows, Function<T, Long> idOf) {
+    Map<Long, T> byId = new HashMap<>();
+    for (T row : rows) {
+      byId.put(idOf.apply(row), row);
+    }
+    List<T> ordered = new ArrayList<>(ids.size());
+    for (Long id : ids) {
+      T row = byId.get(id);
+      if (row != null) {
+        ordered.add(row);
+      }
+    }
+    return ordered;
+  }
 
   @Resource
-  private ShopMapper shopMapper;
+  private ShopRepository shopRepository;
 
   @Resource
   private IUserService userService;
@@ -67,12 +94,13 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
   public Result queryHotBlog(Integer current) {
     // 根据用户查询
     Page<Blog> page =
-        query()
-            .orderByDesc("liked")
-            .orderByDesc("id")
-            .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        blogRepository.findAll(
+            pageOf(
+                current,
+                SystemConstants.MAX_PAGE_SIZE,
+                Sort.by(Sort.Order.desc("liked"), Sort.Order.desc("id"))));
     // 获取当前页数据
-    List<Blog> records = page.getRecords();
+    List<Blog> records = page.getContent();
     enrich(records);
     return Result.ok(records);
   }
@@ -98,7 +126,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
       // 用户未登录，无需查询是否点赞
       return;
     }
-    blog.setIsLike(baseMapper.countLike(blog.getId(), user.getId()) > 0);
+    blog.setIsLike(blogRepository.countLike(blog.getId(), user.getId()) > 0);
   }
 
   @Override
@@ -115,20 +143,20 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     long user = UserHolder.getUser().getId();
     return transactions.execute(
         tx -> {
-          if (baseMapper.selectIdForUpdate(id).isEmpty()) {
+          if (blogRepository.selectIdForUpdate(id).isEmpty()) {
             return Result.fail("笔记不存在");
           }
-          boolean current = baseMapper.countLike(id, user) > 0;
+          boolean current = blogRepository.countLike(id, user) > 0;
           boolean desired = requested == null ? !current : requested;
           if (current == desired) {
             return Result.ok();
           }
           if (desired) {
-            baseMapper.insertLike(id, user);
-            baseMapper.incrementLikes(id);
+            blogRepository.insertLike(id, user);
+            blogRepository.incrementLikes(id);
           } else {
-            baseMapper.deleteLike(id, user);
-            baseMapper.decrementLikes(id);
+            blogRepository.deleteLike(id, user);
+            blogRepository.decrementLikes(id);
           }
           outbox.appendBusinessEvent("LIKE", id, user);
           return Result.ok();
@@ -137,14 +165,13 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
   @Override
   public Result queryBlogLikes(Long id) {
-    List<Long> ids = baseMapper.selectFirstLikeUserIds(id);
+    List<Long> ids = blogRepository.selectFirstLikeUserIds(id);
     if (ids.isEmpty()) {
       return Result.ok(Collections.emptyList());
     }
-    String idStr = StringUtils.collectionToDelimitedString(ids, ",");
-    // 3.根据用户id查询用户 WHERE id IN ( 5 , 1 ) ORDER BY FIELD(id, 5, 1)
+    // 3.根据用户id查询用户，并保持点赞先后顺序
     List<UserDTO> userDTOS =
-        userService.query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list().stream()
+        inIdOrder(ids, userService.listByIds(ids), User::getId).stream()
             .map(UserDTO::from)
             .collect(Collectors.toList());
     // 4.返回
@@ -178,14 +205,11 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
         || blog.getContent() == null
         || blog.getContent().length() > 10000
         || blog.getShopId() == null
-        || shopMapper.countByShopId(blog.getShopId()) == 0) {
+        || shopRepository.countByShopId(blog.getShopId()) == 0) {
       return Result.fail("笔记内容或关联店铺无效");
     }
     // 2.保存探店笔记
-    boolean isSuccess = save(blog);
-    if (!isSuccess) {
-      return Result.fail("新增笔记失败!");
-    }
+    blogRepository.insert(blog);
     media.attach(blog.getId(), blog.getImages());
     outbox.appendBusinessEvent("FEED", blog.getId(), user.getId());
     return Result.ok(blog.getId());
@@ -221,8 +245,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     }
 
     // 5.根据id查询blog
-    String idStr = StringUtils.collectionToDelimitedString(ids, ",");
-    List<Blog> blogs = query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list();
+    List<Blog> blogs = inIdOrder(ids, blogRepository.findAllById(ids), Blog::getId);
 
     enrich(blogs);
     // 6.封装并返回
@@ -245,7 +268,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     Set<Long> likedIds = new HashSet<>();
     if (UserHolder.getUser() != null) {
       likedIds.addAll(
-          baseMapper.selectLikedBlogIds(
+          blogRepository.selectLikedBlogIds(
               UserHolder.getUser().getId(),
               blogs.stream().map(Blog::getId).collect(Collectors.toList())));
     }
@@ -273,11 +296,10 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     UserDTO user = UserHolder.getUser();
     // 根据用户查询
     Page<Blog> page =
-        query()
-            .eq("user_id", user.getId())
-            .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        blogRepository.findByUserId(
+            user.getId(), pageOf(current, SystemConstants.MAX_PAGE_SIZE, Sort.unsorted()));
     // 获取当前页数据
-    List<Blog> records = page.getRecords();
+    List<Blog> records = page.getContent();
     return Result.ok(records);
   }
 
@@ -287,8 +309,9 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
       return Result.fail("shopId 和 current 必须是正整数");
     }
     Page<Blog> page =
-        query().eq("shop_id", shopId).orderByDesc("create_time").page(new Page<>(current, 5));
-    return Result.ok(page.getRecords(), page.getTotal());
+        blogRepository.findByShopId(
+            shopId, pageOf(current, 5, Sort.by(Sort.Order.desc("createTime"))));
+    return Result.ok(page.getContent(), page.getTotalElements());
   }
 
   @Override
@@ -305,23 +328,21 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
     }
     String query = keyword.trim();
     Page<Blog> page =
-        page(
-            new Page<>(current, 5),
-            new QueryWrapper<Blog>()
-                .eq("shop_id", shopId)
-                .and(w -> w.like("title", query).or().like("content", query))
-                .orderByDesc("create_time")
-                .orderByDesc("id"));
-    return Result.ok(page.getRecords(), page.getTotal());
+        blogRepository.searchByShop(
+            shopId,
+            "%" + query + "%",
+            pageOf(current, 5, Sort.by(Sort.Order.desc("createTime"), Sort.Order.desc("id"))));
+    return Result.ok(page.getContent(), page.getTotalElements());
   }
 
   @Override
   public Result queryBlogByUserId(Integer current, Long id) {
     // 根据用户查询
     Page<Blog> page =
-        query().eq("user_id", id).page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        blogRepository.findByUserId(
+            id, pageOf(current, SystemConstants.MAX_PAGE_SIZE, Sort.unsorted()));
     // 获取当前页数据
-    List<Blog> records = page.getRecords();
+    List<Blog> records = page.getContent();
     return Result.ok(records);
   }
 }

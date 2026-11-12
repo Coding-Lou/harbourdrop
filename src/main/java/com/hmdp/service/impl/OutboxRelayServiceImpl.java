@@ -2,11 +2,11 @@ package com.hmdp.service.impl;
 
 import com.hmdp.entity.BusinessOutboxTask;
 import com.hmdp.enums.OutboxState;
-import com.hmdp.mapper.BusinessOutboxMapper;
-import com.hmdp.mapper.SeckillReservationMapper;
 import com.hmdp.messaging.BusinessEvent;
 import com.hmdp.messaging.DeliveryRetryPolicy;
 import com.hmdp.messaging.EventPublisher;
+import com.hmdp.repository.BusinessOutboxRepository;
+import com.hmdp.repository.SeckillReservationRepository;
 import com.hmdp.service.IBusinessEventService;
 import com.hmdp.service.IOutboxRelayService;
 import com.hmdp.utils.FailureMessages;
@@ -28,10 +28,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class OutboxRelayServiceImpl implements IOutboxRelayService {
 
   @Resource
-  private BusinessOutboxMapper businessOutboxMapper;
+  private BusinessOutboxRepository businessOutboxRepository;
 
   @Resource
-  private SeckillReservationMapper seckillReservationMapper;
+  private SeckillReservationRepository seckillReservationRepository;
 
   private final TransactionTemplate transactions;
   private final ObjectProvider<EventPublisher> publishers;
@@ -77,9 +77,9 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     return transactions.execute(
         tx -> {
           List<BusinessOutboxTask> tasks =
-              businessOutboxMapper.selectClaimableEvents(Math.max(1, Math.min(100, batchSize)));
+              businessOutboxRepository.selectClaimableEvents(Math.max(1, Math.min(100, batchSize)));
           for (BusinessOutboxTask task : tasks) {
-            businessOutboxMapper.claimEvent(leaseOwner, effectiveLeaseSeconds(), task.getId());
+            businessOutboxRepository.claimEvent(leaseOwner, effectiveLeaseSeconds(), task.getId());
           }
           return tasks;
         });
@@ -102,7 +102,8 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
   private void sendClaimedTask(BusinessOutboxTask task, String leaseOwner) {
     long started = System.nanoTime();
     try {
-      if (businessOutboxMapper.renewLease(effectiveLeaseSeconds(), task.getId(), leaseOwner) == 0) {
+      if (businessOutboxRepository.renewLease(effectiveLeaseSeconds(), task.getId(), leaseOwner)
+          == 0) {
         return;
       }
       if (deliverOutboxTask(task, leaseOwner)) {
@@ -122,13 +123,13 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     // Kafka has no per-message delay: a future deadline stays in the outbox (next_attempt_at =
     // deliver_at) and is published by the relay once due, so the database is the timer.
     if (event.getDeliverAt() != null && event.getDeliverAt() > System.currentTimeMillis()) {
-      businessOutboxMapper.deferDeadline(task.getId(), leaseOwner);
+      businessOutboxRepository.deferDeadline(task.getId(), leaseOwner);
       return false;
     }
     if (mqEnabled) {
       publishers.getObject().publish(event);
       // 快速消费可能已经完成；owner/state 条件防止 DONE 被覆盖成 SENT。
-      businessOutboxMapper.markSent(task.getId(), leaseOwner);
+      businessOutboxRepository.markSent(task.getId(), leaseOwner);
       return true;
     }
     consumer.consume(event, BusinessEventServiceImpl.resolveConsumerGroup(event.getKind()));
@@ -143,7 +144,7 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
     transactions.execute(
         tx -> {
           int changed =
-              businessOutboxMapper.recordSendFailure(
+              businessOutboxRepository.recordSendFailure(
                   attempts,
                   DeliveryRetryPolicy.delaySeconds(attempts),
                   needsReview ? OutboxState.REVIEW.name() : OutboxState.PENDING.name(),
@@ -151,7 +152,7 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
                   task.getId(),
                   leaseOwner);
           if (changed > 0 && needsReview && "SECKILL_FULFILL".equals(task.getKind())) {
-            seckillReservationMapper.markProcessingForReview(reason, task.getAggregateId());
+            seckillReservationRepository.markProcessingForReview(reason, task.getAggregateId());
           }
           return null;
         });
@@ -171,14 +172,14 @@ public class OutboxRelayServiceImpl implements IOutboxRelayService {
   public void redriveUnconsumedEvents() {
     int age = Math.max(30, redeliverySeconds);
     // Future deadlines are expected to remain unconsumed. Redrive only after their due time.
-    businessOutboxMapper.redriveUnconsumedEvents(-age, -age);
+    businessOutboxRepository.redriveUnconsumedEvents(-age, -age);
   }
 
   @Scheduled(fixedDelay = 10000)
   @Override
   public void refreshMetrics() {
-    pending.set(businessOutboxMapper.countPendingEvents());
-    review.set(businessOutboxMapper.countReviewEvents());
-    inflight.set(businessOutboxMapper.countDueSentEvents());
+    pending.set(businessOutboxRepository.countPendingEvents());
+    review.set(businessOutboxRepository.countReviewEvents());
+    inflight.set(businessOutboxRepository.countDueSentEvents());
   }
 }

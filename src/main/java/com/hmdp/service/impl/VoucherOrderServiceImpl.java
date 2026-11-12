@@ -1,14 +1,11 @@
 package com.hmdp.service.impl;
 
-import com.baomidou.mybatisplus.extension.conditions.query.LambdaQueryChainWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Voucher;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.enums.OrderStatus;
 import com.hmdp.enums.VoucherType;
-import com.hmdp.mapper.VoucherOrderMapper;
+import com.hmdp.repository.VoucherOrderRepository;
 import com.hmdp.service.IOrderLifecycleService;
 import com.hmdp.service.ISeckillService;
 import com.hmdp.service.ISeckillVoucherService;
@@ -34,6 +31,9 @@ import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Service;
@@ -47,8 +47,17 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Slf4j
 @Service
-public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, VoucherOrder>
-    implements IVoucherOrderService {
+public class VoucherOrderServiceImpl implements IVoucherOrderService {
+  private static final Sort NEWEST_FIRST =
+      Sort.by(Sort.Order.desc("createTime"), Sort.Order.desc("id"));
+
+  @Resource
+  private VoucherOrderRepository voucherOrderRepository;
+
+  @Override
+  public VoucherOrder getById(Long orderId) {
+    return orderId == null ? null : voucherOrderRepository.findById(orderId).orElse(null);
+  }
 
   @Value("${citylens.payment.mock-enabled:false}")
   private boolean mockPaymentEnabled;
@@ -114,16 +123,10 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
               }
               return null;
             }
-            if (query().eq("user_id", userId).eq("voucher_id", voucherId).count() > 0) {
+            if (voucherOrderRepository.countByUserIdAndVoucherId(userId, voucherId) > 0) {
               throw new IllegalStateException("资格对应的订单号不一致，保留消息核对");
             }
-            boolean deducted =
-                seckillVoucherService
-                    .update()
-                    .setSql("stock = stock - 1")
-                    .eq("voucher_id", voucherId)
-                    .gt("stock", 0)
-                    .update();
+            boolean deducted = seckillVoucherService.deductStock(voucherId);
             if (!deducted) {
               throw new IllegalStateException("库存不足，保留消息核对");
             }
@@ -133,9 +136,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             }
             snapshot(voucherOrder, voucher);
             voucherOrder.setStatus(initialOrderStatus(voucher));
-            if (!save(voucherOrder)) {
-              throw new IllegalStateException("订单写入失败，回滚库存");
-            }
+            // insert() flushes immediately: a failure throws here and rolls back the stock.
+            voucherOrderRepository.insert(voucherOrder);
             if (coordinator != null) {
               coordinator.markReservationSuccessful(voucherOrder.getId());
             }
@@ -206,12 +208,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
           return Result.ok(Long.parseLong(original.toString()));
         }
         VoucherOrder existing =
-            query()
-                .eq("user_id", userId)
-                .eq("voucher_id", voucherId)
-                .orderByDesc("create_time")
-                .last("LIMIT 1")
-                .one();
+            voucherOrderRepository.findFirstByUserIdAndVoucherIdOrderByCreateTimeDesc(
+                userId, voucherId);
         if (existing != null) {
           return Result.ok(existing.getId());
         }
@@ -234,8 +232,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     try {
       return transactionTemplate.execute(
           tx -> {
-            baseMapper.insertOrdinarySlot(userId, voucherId);
-            baseMapper.lockOrdinarySlot(userId, voucherId);
+            voucherOrderRepository.insertOrdinarySlot(userId, voucherId);
+            voucherOrderRepository.lockOrdinarySlot(userId, voucherId);
             Voucher voucher = voucherService.getById(voucherId);
             if (voucher == null
                 || voucher.getStatus() == null
@@ -245,13 +243,9 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
               return Result.fail("普通券不存在或已下架");
             }
             VoucherOrder existing =
-                query()
-                    .eq("user_id", userId)
-                    .eq("voucher_id", voucherId)
-                    .ne("status", OrderStatus.CANCELLED.getCode())
-                    .orderByDesc("create_time")
-                    .last("LIMIT 1")
-                    .one();
+                voucherOrderRepository
+                    .findFirstByUserIdAndVoucherIdAndStatusNotOrderByCreateTimeDesc(
+                        userId, voucherId, OrderStatus.CANCELLED.getCode());
             if (existing != null) {
               return Result.ok(existing.getId());
             }
@@ -262,9 +256,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             snapshot(order, voucher);
             // 免费券直接领取；付费券只创建待支付订单，不能冒充支付成功。
             order.setStatus(initialOrderStatus(voucher));
-            if (!save(order)) {
-              return Result.fail("创建订单失败");
-            }
+            voucherOrderRepository.insert(order);
             lifecycle.registerOrderCreatedEventAndDeadline(order.getId());
             return Result.ok(order.getId());
           });
@@ -303,12 +295,8 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
   @Override
   public Result queryMyVoucherOrder(Long voucherId) {
     VoucherOrder order =
-        query()
-            .eq("user_id", UserHolder.getUser().getId())
-            .eq("voucher_id", voucherId)
-            .orderByDesc("create_time")
-            .last("LIMIT 1")
-            .one();
+        voucherOrderRepository.findFirstByUserIdAndVoucherIdOrderByCreateTimeDesc(
+            UserHolder.getUser().getId(), voucherId);
     return Result.ok(order);
   }
 
@@ -317,28 +305,26 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
     if (page == null || page < 1 || page > 10000) {
       return Result.fail("分页参数无效");
     }
-    LambdaQueryChainWrapper<VoucherOrder> query =
-        lambdaQuery().eq(VoucherOrder::getUserId, UserHolder.getUser().getId());
-    if (heldOnly) {
-      query.eq(VoucherOrder::getStatus, OrderStatus.PAID.getCode());
-    }
+    Long owner = UserHolder.getUser().getId();
+    PageRequest request = PageRequest.of(page - 1, 20, NEWEST_FIRST);
+    // The owner always comes from the authenticated session, never from request parameters.
     Page<VoucherOrder> result =
-        query
-            .orderByDesc(VoucherOrder::getCreateTime)
-            .orderByDesc(VoucherOrder::getId)
-            .page(new Page<>(page, 20));
+        heldOnly
+            ? voucherOrderRepository.findByUserIdAndStatus(
+                owner, OrderStatus.PAID.getCode(), request)
+            : voucherOrderRepository.findByUserId(owner, request);
     Map<Long, Voucher> vouchers =
-        result.getRecords().isEmpty()
+        result.getContent().isEmpty()
             ? Collections.emptyMap()
             : voucherService
                 .listByIds(
-                    result.getRecords().stream()
+                    result.getContent().stream()
                         .map(VoucherOrder::getVoucherId)
                         .collect(Collectors.toSet()))
                 .stream()
                 .collect(Collectors.toMap(Voucher::getId, v -> v));
     List<Map<String, Object>> items = new ArrayList<>();
-    for (VoucherOrder order : result.getRecords()) {
+    for (VoucherOrder order : result.getContent()) {
       Voucher voucher = vouchers.get(order.getVoucherId());
       Map<String, Object> item = new HashMap<>();
       item.put("order_id", order.getId().toString());
@@ -366,7 +352,7 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
       }
       items.add(item);
     }
-    return Result.ok(items, result.getTotal());
+    return Result.ok(items, result.getTotalElements());
   }
 
   @Override
@@ -396,14 +382,13 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("订单不是待支付状态");
           }
           boolean changed =
-              update()
-                  .set("status", OrderStatus.PAID.getCode())
-                  .set("pay_time", LocalDateTime.now())
-                  .eq("id", orderId)
-                  .eq("user_id", userId)
-                  .eq("status", OrderStatus.UNPAID.getCode())
-                  .apply("(expire_at IS NULL OR expire_at > NOW(3))")
-                  .update();
+              voucherOrderRepository.markPaidIfUnpaidAndNotExpired(
+                      orderId,
+                      userId,
+                      OrderStatus.UNPAID.getCode(),
+                      OrderStatus.PAID.getCode(),
+                      LocalDateTime.now())
+                  > 0;
           if (!changed) {
             VoucherOrder latest = getById(orderId);
             if (latest == null
@@ -443,12 +428,12 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
             return Result.fail("订单不是待支付状态");
           }
           boolean changed =
-              update()
-                  .set("status", OrderStatus.CANCELLED.getCode())
-                  .eq("id", orderId)
-                  .eq("user_id", userId)
-                  .eq("status", OrderStatus.UNPAID.getCode())
-                  .update();
+              voucherOrderRepository.changeStatusIfCurrent(
+                      orderId,
+                      userId,
+                      OrderStatus.UNPAID.getCode(),
+                      OrderStatus.CANCELLED.getCode())
+                  > 0;
           if (changed) {
             lifecycle.registerOrderClosedEvent(orderId, userId);
           }

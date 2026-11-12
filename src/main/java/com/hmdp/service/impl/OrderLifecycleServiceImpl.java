@@ -2,7 +2,7 @@ package com.hmdp.service.impl;
 
 import com.hmdp.enums.OrderStatus;
 import com.hmdp.enums.VoucherType;
-import com.hmdp.mapper.VoucherOrderMapper;
+import com.hmdp.repository.VoucherOrderRepository;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.IOrderLifecycleService;
 import jakarta.annotation.Resource;
@@ -18,7 +18,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
 
   @Resource
-  private VoucherOrderMapper voucherOrderMapper;
+  private VoucherOrderRepository voucherOrderRepository;
 
   private final IBusinessOutboxService outbox;
   private final TransactionTemplate transactions;
@@ -43,8 +43,8 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
     if (timeoutMinutes < 1 || timeoutMinutes > 1440) {
       throw new IllegalStateException("普通订单超时必须在 1～1440 分钟之间");
     }
-    voucherOrderMapper.initializeDeadline(timeoutMinutes, orderId);
-    Map<String, Object> row = voucherOrderMapper.selectDeadline(orderId);
+    voucherOrderRepository.initializeDeadline(timeoutMinutes, orderId);
+    Map<String, Object> row = voucherOrderRepository.selectDeadline(orderId);
     Long userId = ((Number) row.get("user_id")).longValue();
     outbox.appendBusinessEvent("ORDER_CREATED", orderId, userId);
     if (row.get("expire_at") != null) {
@@ -75,7 +75,7 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
         transactions.execute(
             tx -> {
               List<Map<String, Object>> rows =
-                  voucherOrderMapper.selectExpiryStateForUpdate(orderId);
+                  voucherOrderRepository.selectExpiryStateForUpdate(orderId);
               if (rows.isEmpty()) {
                 return false;
               }
@@ -95,7 +95,7 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
                     orderId, userId, (Timestamp) row.get("expire_at"));
                 return false;
               }
-              if (voucherOrderMapper.closeExpiredOrder(orderId) == 0) {
+              if (voucherOrderRepository.closeExpiredOrder(orderId) == 0) {
                 return false;
               }
               registerOrderClosedEvent(orderId, userId);
@@ -111,7 +111,7 @@ public class OrderLifecycleServiceImpl implements IOrderLifecycleService {
 
   @Override
   public void expireOverdueOrders() {
-    for (Long orderId : voucherOrderMapper.selectExpiredOrdinaryOrders()) {
+    for (Long orderId : voucherOrderRepository.selectExpiredOrdinaryOrders()) {
       closeExpiredOrdinaryOrder(orderId);
     }
   }

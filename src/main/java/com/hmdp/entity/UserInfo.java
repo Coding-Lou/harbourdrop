@@ -1,14 +1,16 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * @author 虎哥
@@ -17,14 +19,16 @@ import lombok.experimental.Accessors;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_user_info")
+@Entity
+@Table(name = "tb_user_info")
+@DynamicInsert
+@DynamicUpdate
 public class UserInfo implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
   /** 主键，用户id */
-  @TableId(value = "user_id", type = IdType.AUTO)
-  private Long userId;
+  @Id private Long userId;
 
   /** 城市名称 */
   private String city;

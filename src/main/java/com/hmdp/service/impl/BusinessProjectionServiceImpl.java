@@ -4,15 +4,15 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.BusinessOutboxTask;
 import com.hmdp.entity.SeckillReservation;
 import com.hmdp.enums.ReservationState;
-import com.hmdp.mapper.BlogMapper;
-import com.hmdp.mapper.BusinessOutboxMapper;
-import com.hmdp.mapper.FollowMapper;
-import com.hmdp.mapper.MediaMapper;
-import com.hmdp.mapper.SeckillReservationMapper;
-import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.messaging.BusinessEventType;
 import com.hmdp.messaging.ProjectionResult;
 import com.hmdp.reliability.MediaStorage;
+import com.hmdp.repository.BlogRepository;
+import com.hmdp.repository.BusinessOutboxRepository;
+import com.hmdp.repository.FollowRepository;
+import com.hmdp.repository.MediaRepository;
+import com.hmdp.repository.SeckillReservationRepository;
+import com.hmdp.repository.VoucherOrderRepository;
 import com.hmdp.service.IBehaviorJournalService;
 import com.hmdp.service.IBusinessProjectionService;
 import com.hmdp.service.IOrderLifecycleService;
@@ -36,22 +36,22 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   private static final int FEED_MAX_ENTRIES = 1000;
 
   @Resource
-  private BlogMapper blogMapper;
+  private BlogRepository blogRepository;
 
   @Resource
-  private BusinessOutboxMapper businessOutboxMapper;
+  private BusinessOutboxRepository businessOutboxRepository;
 
   @Resource
-  private FollowMapper followMapper;
+  private FollowRepository followRepository;
 
   @Resource
-  private MediaMapper mediaMapper;
+  private MediaRepository mediaRepository;
 
   @Resource
-  private SeckillReservationMapper seckillReservationMapper;
+  private SeckillReservationRepository seckillReservationRepository;
 
   @Resource
-  private VoucherOrderMapper voucherOrderMapper;
+  private VoucherOrderRepository voucherOrderRepository;
 
   @Resource
   private ISeckillService coordinator;
@@ -140,7 +140,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   }
 
   private void projectOrderEvent(BusinessOutboxTask task, BusinessEventType type) {
-    voucherOrderMapper.insertEventHistory(
+    voucherOrderRepository.insertEventHistory(
         task.getId(), task.getAggregateId(), task.getKind(), task.getCreatedAt());
     if (type == BusinessEventType.ORDER_CREATED || type == BusinessEventType.ORDER_PAID) {
       behavior.appendOrderBehaviorEvent(task);
@@ -149,7 +149,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
 
   private void deleteOwnedMedia(BusinessOutboxTask task) {
     String path = MediaStorage.normalize(task.getResourcePath());
-    List<String> states = mediaMapper.selectOwnedStates(path, task.getUserId());
+    List<String> states = mediaRepository.selectOwnedStates(path, task.getUserId());
     if (states.isEmpty() || "DELETED".equals(states.get(0))) {
       return;
     }
@@ -158,7 +158,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
     }
     // 文件不参与 MySQL 事务；重复删除必须安全，随后登记持久完成状态。
     mediaStorage.delete(path);
-    mediaMapper.markDeleted(path);
+    mediaRepository.markDeleted(path);
   }
 
   private void publishSeckillActivity(long voucherId) {
@@ -169,7 +169,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   }
 
   private void enqueueSeckillRetry(long orderId) {
-    SeckillReservation reservation = seckillReservationMapper.selectReservation(orderId);
+    SeckillReservation reservation = seckillReservationRepository.selectReservation(orderId);
     if (reservation == null) {
       throw new IllegalStateException("抢购请求不存在");
     }
@@ -188,14 +188,14 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
     long blogId = task.getAggregateId();
     double publishedAtMillis = task.getCreatedAt().getTime();
     List<Map<String, Object>> followers =
-        followMapper.selectFanBatch(task.getUserId(), cursor, task.getCreatedAt());
+        followRepository.selectFanBatch(task.getUserId(), cursor, task.getCreatedAt());
     for (Map<String, Object> follower : followers) {
       String feedKey = "feed:" + follower.get("user_id");
       redis.opsForZSet().add(feedKey, String.valueOf(blogId), publishedAtMillis);
       redis.opsForZSet().removeRange(feedKey, 0, -FEED_MAX_ENTRIES - 1);
       cursor = ((Number) follower.get("id")).longValue();
     }
-    businessOutboxMapper.updateCursor(cursor, task.getId());
+    businessOutboxRepository.updateCursor(cursor, task.getId());
     return followers.size() < FEED_BATCH_SIZE
         ? ProjectionResult.COMPLETE
         : ProjectionResult.CONTINUE;
@@ -204,7 +204,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   private void projectFollow(long userId, long followedUserId) {
     // 读取当前关系，迟到的旧事件不能把已取消的关注恢复回来。
     String followKey = "follows:" + userId;
-    if (followMapper.countEdge(userId, followedUserId) > 0) {
+    if (followRepository.countEdge(userId, followedUserId) > 0) {
       redis.opsForSet().add(followKey, String.valueOf(followedUserId));
     } else {
       redis.opsForSet().remove(followKey, String.valueOf(followedUserId));
@@ -212,7 +212,7 @@ public class BusinessProjectionServiceImpl implements IBusinessProjectionService
   }
 
   private void projectLike(long userId, long blogId) {
-    List<Map<String, Object>> likes = blogMapper.selectLikeTimestamp(blogId, userId);
+    List<Map<String, Object>> likes = blogRepository.selectLikeTimestamp(blogId, userId);
     String likedKey = "blog:liked:" + blogId;
     if (likes.isEmpty()) {
       redis.opsForZSet().remove(likedKey, String.valueOf(userId));

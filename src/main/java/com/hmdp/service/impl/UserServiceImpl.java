@@ -6,14 +6,13 @@ import static com.hmdp.utils.RedisConstants.LOGIN_USER_KEY;
 import static com.hmdp.utils.RedisConstants.LOGIN_USER_TTL;
 import static com.hmdp.utils.RedisConstants.USER_SIGN_KEY;
 
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.LoginFormDTO;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.User;
-import com.hmdp.mapper.UserMapper;
 import com.hmdp.reliability.RateLimiter;
 import com.hmdp.reliability.RedisScripts;
+import com.hmdp.repository.UserRepository;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RandomCodes;
 import com.hmdp.utils.RegexUtils;
@@ -23,13 +22,14 @@ import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpSession;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -43,7 +43,19 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
+public class UserServiceImpl implements IUserService {
+  @Resource
+  private UserRepository userRepository;
+
+  @Override
+  public User getById(Long id) {
+    return id == null ? null : userRepository.findById(id).orElse(null);
+  }
+
+  @Override
+  public List<User> listByIds(Collection<Long> ids) {
+    return userRepository.findAllById(ids);
+  }
 
   @Resource
   private StringRedisTemplate stringRedisTemplate;
@@ -100,15 +112,16 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     // 4.一致，根据手机号查询用户 select * from tb_user where phone = ?
-    User user = query().eq("phone", phone).one();
+    User user = userRepository.findByPhone(phone);
 
     // 5.判断用户是否存在
     if (user == null) {
       // 6.不存在，创建新用户并保存
       try {
         user = createUserWithPhone(phone);
-      } catch (DuplicateKeyException duplicate) {
-        user = query().eq("phone", phone).one();
+      } catch (DataIntegrityViolationException duplicate) {
+        // A concurrent first login created the same phone; the unique key decides the winner.
+        user = userRepository.findByPhone(phone);
       }
     }
 
@@ -200,7 +213,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     user.setPhone(phone);
     user.setNickName(SystemConstants.USER_NICK_NAME_PREFIX + RandomCodes.lowerAlphanumeric(10));
     // 2.保存用户
-    save(user);
+    userRepository.insert(user);
     return user;
   }
 

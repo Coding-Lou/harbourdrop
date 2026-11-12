@@ -17,7 +17,6 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.impl.ShopServiceImpl;
 import com.hmdp.utils.CacheClient;
-import java.io.Serializable;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
@@ -29,7 +28,7 @@ class ShopCacheCompatibilityTest {
     Shop database;
 
     @Override
-    public Shop getById(Serializable id) {
+    public Shop getById(Long id) {
       reads++;
       return database;
     }

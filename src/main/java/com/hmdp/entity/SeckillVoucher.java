@@ -1,13 +1,15 @@
 package com.hmdp.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
+import org.hibernate.annotations.DynamicInsert;
+import org.hibernate.annotations.DynamicUpdate;
 
 /**
  * 秒杀优惠券表，与优惠券是一对一关系
@@ -18,14 +20,16 @@ import lombok.experimental.Accessors;
 @Data
 @EqualsAndHashCode(callSuper = false)
 @Accessors(chain = true)
-@TableName("tb_seckill_voucher")
+@Entity
+@Table(name = "tb_seckill_voucher")
+@DynamicInsert
+@DynamicUpdate
 public class SeckillVoucher implements Serializable {
 
   private static final long serialVersionUID = 1L;
 
   /** 关联的优惠券的id */
-  @TableId(value = "voucher_id", type = IdType.INPUT)
-  private Long voucherId;
+  @Id private Long voucherId;
 
   /** 库存 */
   private Integer stock;

@@ -4,13 +4,12 @@ import static com.hmdp.utils.RedisConstants.CACHE_SHOP_KEY;
 import static com.hmdp.utils.RedisConstants.CACHE_SHOP_TTL;
 import static com.hmdp.utils.RedisConstants.SHOP_GEO_KEY;
 
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
 import com.hmdp.dto.ShopSearchDTO;
+import com.hmdp.entity.SeckillVoucher;
 import com.hmdp.entity.Shop;
-import com.hmdp.mapper.ShopMapper;
+import com.hmdp.entity.Voucher;
+import com.hmdp.repository.ShopRepository;
 import com.hmdp.service.IBehaviorJournalService;
 import com.hmdp.service.IBusinessOutboxService;
 import com.hmdp.service.IShopService;
@@ -18,16 +17,28 @@ import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import jakarta.annotation.Resource;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Expression;
+import jakarta.persistence.criteria.Order;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.GeoResult;
 import org.springframework.data.geo.GeoResults;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.domain.geo.GeoReference;
@@ -42,7 +53,12 @@ import org.springframework.util.StringUtils;
  * @since 2021-12-22
  */
 @Service
-public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IShopService {
+public class ShopServiceImpl implements IShopService {
+  private static final double EARTH_RADIUS_METERS = 6371000.0;
+
+  @Resource
+  private ShopRepository shopRepository;
+
   @Resource
   private IBehaviorJournalService behavior;
 
@@ -88,6 +104,24 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
   }
 
   @Override
+  public Shop getById(Long id) {
+    return id == null ? null : shopRepository.findById(id).orElse(null);
+  }
+
+  @Override
+  public List<Shop> list() {
+    return shopRepository.findAll();
+  }
+
+  private List<Shop> listByIds(Collection<Long> ids) {
+    return shopRepository.findAllById(ids);
+  }
+
+  private static PageRequest pageOf(Integer current, int size) {
+    return PageRequest.of(Math.max(1, current == null ? 1 : current) - 1, size);
+  }
+
+  @Override
   @Transactional
   public Result update(Shop shop) {
     Long id = shop.getId();
@@ -95,7 +129,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
       return Result.fail("店铺id不能为空");
     }
     // 1.更新数据库
-    if (!updateById(shop)) {
+    if (!shopRepository.updateById(shop)) {
       return Result.fail("店铺不存在或未修改");
     }
     // Durable invalidation event commits with the update; immediate deletion runs after commit.
@@ -109,11 +143,11 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     if (x == null || y == null) {
       // 不需要坐标查询，按数据库查询
       Page<Shop> page =
-          query()
-              .eq("type_id", typeId)
-              .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
+          shopRepository.findAll(
+              (shop, query, cb) -> cb.equal(shop.get("typeId"), typeId.longValue()),
+              pageOf(current, SystemConstants.DEFAULT_PAGE_SIZE));
       // 返回数据
-      return Result.ok(page.getRecords());
+      return Result.ok(page.getContent());
     }
 
     // 2.计算分页参数
@@ -167,11 +201,18 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
               Distance distance = result.getDistance();
               distanceMap.put(shopIdStr, distance);
             });
-    // 5.根据id查询Shop
-    String idStr = StringUtils.collectionToDelimitedString(ids, ",");
-    List<Shop> shops = query().in("id", ids).last("ORDER BY FIELD(id," + idStr + ")").list();
-    for (Shop shop : shops) {
-      shop.setDistance(distanceMap.get(shop.getId().toString()).getValue());
+    // 5.根据id查询Shop，并保持 GEO 返回的距离顺序
+    Map<Long, Shop> byId = new HashMap<>();
+    for (Shop shop : listByIds(ids)) {
+      byId.put(shop.getId(), shop);
+    }
+    List<Shop> shops = new ArrayList<>(ids.size());
+    for (Long shopId : ids) {
+      Shop shop = byId.get(shopId);
+      if (shop != null) {
+        shop.setDistance(distanceMap.get(shopId.toString()).getValue());
+        shops.add(shop);
+      }
     }
     // 6.返回
     return Result.ok(shops);
@@ -216,68 +257,129 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
       return Result.fail("按距离排序需要 x 和 y");
     }
 
-    QueryWrapper<Shop> query = new QueryWrapper<>();
-    query.eq("type_id", criteria.getTypeId());
-    if (StringUtils.hasText(criteria.getKeyword())) {
-      query.like("name", criteria.getKeyword().trim());
-    }
-    if (StringUtils.hasText(criteria.getArea())) {
-      String area = criteria.getArea().trim();
-      query.and(q -> q.like("area", area).or().like("address", area));
-    }
-    if (criteria.getMaxPrice() != null) {
-      query.le("avg_price", criteria.getMaxPrice());
-    }
-    if (criteria.getMinScore() != null) {
-      query.ge("score", criteria.getMinScore());
-    }
-    if (Boolean.TRUE.equals(criteria.getHasVoucher())) {
-      query.apply(
-          "EXISTS (SELECT 1 FROM tb_voucher v "
-              + "LEFT JOIN tb_seckill_voucher sv ON sv.voucher_id = v.id "
-              + "WHERE v.shop_id = tb_shop.id AND v.status = 1 "
-              + "AND (v.type = 0 OR (v.type = 1 AND sv.stock > 0 "
-              + "AND sv.begin_time <= NOW() AND sv.end_time >= NOW())))");
-    }
-
-    if (x == null) {
-      if ("price".equals(sort)) {
-        query.orderByAsc("avg_price").orderByDesc("score").orderByAsc("id");
-      } else {
-        query.orderByDesc("score").orderByAsc("avg_price").orderByAsc("id");
+    Long typeId = criteria.getTypeId();
+    String keyword =
+        StringUtils.hasText(criteria.getKeyword()) ? criteria.getKeyword().trim() : null;
+    String area = StringUtils.hasText(criteria.getArea()) ? criteria.getArea().trim() : null;
+    Long maxPrice = criteria.getMaxPrice();
+    Integer minScore = criteria.getMinScore();
+    boolean hasVoucher = Boolean.TRUE.equals(criteria.getHasVoucher());
+    String order = sort;
+    Specification<Shop> spec =
+        (shop, query, cb) -> {
+          List<Predicate> where = new ArrayList<>();
+          where.add(cb.equal(shop.get("typeId"), typeId));
+          if (keyword != null) {
+            where.add(cb.like(shop.get("name"), "%" + keyword + "%"));
+          }
+          if (area != null) {
+            where.add(
+                cb.or(
+                    cb.like(shop.get("area"), "%" + area + "%"),
+                    cb.like(shop.get("address"), "%" + area + "%")));
+          }
+          if (maxPrice != null) {
+            where.add(cb.le(shop.get("avgPrice"), maxPrice));
+          }
+          if (minScore != null) {
+            where.add(cb.ge(shop.get("score"), minScore));
+          }
+          if (hasVoucher) {
+            where.add(cb.exists(orderableVoucherOf(shop, query, cb)));
+          }
+          List<Order> orders = new ArrayList<>();
+          if (x != null) {
+            // 先用经纬度范围缩小候选集，再用球面距离精确筛选 5 公里范围；排序与分页都在 MySQL 中完成。
+            final double radiusMeters = 5000.0;
+            double latDelta = radiusMeters / 111320.0;
+            double lonDelta =
+                radiusMeters / (111320.0 * Math.max(0.01, Math.cos(Math.toRadians(y))));
+            where.add(cb.between(shop.get("x"), x - lonDelta, x + lonDelta));
+            where.add(cb.between(shop.get("y"), y - latDelta, y + latDelta));
+            Expression<Double> distance = distanceExpression(shop, cb, x, y);
+            where.add(cb.le(distance, radiusMeters));
+            if ("distance".equals(order)) {
+              orders.add(cb.asc(distance));
+            } else if ("price".equals(order)) {
+              orders.add(cb.asc(shop.get("avgPrice")));
+            } else {
+              orders.add(cb.desc(shop.get("score")));
+            }
+          } else if ("price".equals(order)) {
+            orders.add(cb.asc(shop.get("avgPrice")));
+            orders.add(cb.desc(shop.get("score")));
+          } else {
+            orders.add(cb.desc(shop.get("score")));
+            orders.add(cb.asc(shop.get("avgPrice")));
+          }
+          orders.add(cb.asc(shop.get("id")));
+          query.orderBy(orders);
+          return cb.and(where.toArray(new Predicate[0]));
+        };
+    Page<Shop> result = shopRepository.findAll(spec, PageRequest.of(page - 1, size));
+    if (x != null) {
+      for (Shop shop : result.getContent()) {
+        shop.setDistance(distanceMeters(x, y, shop.getX(), shop.getY()));
       }
-      Page<Shop> resultPage = page(new Page<>(page, size), query);
-      return Result.ok(resultPage.getRecords(), resultPage.getTotal());
     }
+    return Result.ok(result.getContent(), result.getTotalElements());
+  }
 
-    // 先用经纬度范围缩小 MySQL 候选集，再用球面距离精确筛选 5 公里范围。
-    final double radiusMeters = 5000.0;
-    double latDelta = radiusMeters / 111320.0;
-    double lonDelta = radiusMeters / (111320.0 * Math.max(0.01, Math.cos(Math.toRadians(y))));
-    query.between("x", x - lonDelta, x + lonDelta).between("y", y - latDelta, y + latDelta);
-    // Bound heap usage by doing distance filtering, ordering and pagination in MySQL.
-    String distance =
-        "(6371000.0 * 2 * ASIN(SQRT(LEAST(1.0, POW(SIN(RADIANS(y - "
-            + y
-            + ")/2),2) + COS(RADIANS("
-            + y
-            + ")) * COS(RADIANS(y)) * POW(SIN(RADIANS(x - "
-            + x
-            + ")/2),2)))))";
-    query.apply(distance + " <= {0}", radiusMeters);
-    if ("distance".equals(sort)) {
-      query.orderByAsc(distance);
-    } else if ("price".equals(sort)) {
-      query.orderByAsc("avg_price");
-    } else {
-      query.orderByDesc("score");
-    }
-    query.orderByAsc("id");
-    Page<Shop> nearbyPage = page(new Page<>(page, size), query);
-    for (Shop shop : nearbyPage.getRecords()) {
-      shop.setDistance(distanceMeters(x, y, shop.getX(), shop.getY()));
-    }
-    return Result.ok(nearbyPage.getRecords(), nearbyPage.getTotal());
+  /**
+   * A usable voucher: active ordinary voucher, or a seckill voucher with stock inside its window.
+   */
+  private static Subquery<Long> orderableVoucherOf(
+      Root<Shop> shop, CriteriaQuery<?> query, CriteriaBuilder cb) {
+    Subquery<Long> vouchers = query.subquery(Long.class);
+    Root<Voucher> voucher = vouchers.from(Voucher.class);
+    Subquery<Long> activities = query.subquery(Long.class);
+    Root<SeckillVoucher> activity = activities.from(SeckillVoucher.class);
+    activities
+        .select(activity.get("voucherId"))
+        .where(
+            cb.equal(activity.get("voucherId"), voucher.get("id")),
+            cb.gt(activity.get("stock"), 0),
+            cb.lessThanOrEqualTo(activity.<LocalDateTime>get("beginTime"), cb.localDateTime()),
+            cb.greaterThanOrEqualTo(activity.<LocalDateTime>get("endTime"), cb.localDateTime()));
+    return vouchers
+        .select(voucher.get("id"))
+        .where(
+            cb.equal(voucher.get("shopId"), shop.get("id")),
+            cb.equal(voucher.get("status"), 1),
+            cb.or(
+                cb.equal(voucher.get("type"), 0),
+                cb.and(cb.equal(voucher.get("type"), 1), cb.exists(activities))));
+  }
+
+  /** Haversine distance in meters, evaluated by MySQL so filtering and paging stay in SQL. */
+  private static Expression<Double> distanceExpression(
+      Root<Shop> shop, CriteriaBuilder cb, double x, double y) {
+    Expression<Double> halfLat =
+        cb.quot(radians(cb, cb.diff(shop.<Double>get("y"), y)), 2.0).as(Double.class);
+    Expression<Double> halfLon =
+        cb.quot(radians(cb, cb.diff(shop.<Double>get("x"), x)), 2.0).as(Double.class);
+    Expression<Double> a =
+        cb.sum(
+            power2(cb, fn(cb, "SIN", halfLat)),
+            cb.prod(
+                cb.prod(
+                    fn(cb, "COS", radians(cb, cb.literal(y))),
+                    fn(cb, "COS", radians(cb, shop.get("y")))),
+                power2(cb, fn(cb, "SIN", halfLon))));
+    Expression<Double> clamped = cb.function("LEAST", Double.class, cb.literal(1.0), a);
+    return cb.prod(EARTH_RADIUS_METERS * 2, fn(cb, "ASIN", fn(cb, "SQRT", clamped)));
+  }
+
+  private static Expression<Double> fn(CriteriaBuilder cb, String name, Expression<?> arg) {
+    return cb.function(name, Double.class, arg);
+  }
+
+  private static Expression<Double> radians(CriteriaBuilder cb, Expression<?> degrees) {
+    return fn(cb, "RADIANS", degrees);
+  }
+
+  private static Expression<Double> power2(CriteriaBuilder cb, Expression<Double> base) {
+    return cb.function("POW", Double.class, base, cb.literal(2.0));
   }
 
   private static double distanceMeters(double x1, double y1, double x2, double y2) {
@@ -302,18 +404,23 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         || !("score".equals(sort) || "price".equals(sort))) {
       return Result.fail("店铺查询参数无效");
     }
-    QueryWrapper<Shop> query = new QueryWrapper<>();
-    query
-        .eq(typeId != null, "type_id", typeId)
-        .like(StringUtils.hasText(keyword), "name", keyword.trim());
-    if ("price".equals(sort)) {
-      query.orderByAsc("avg_price");
-    } else {
-      query.orderByDesc("score");
-    }
-    query.orderByAsc("id");
-    Page<Shop> result = page(new Page<>(page, size), query);
-    return Result.ok(result.getRecords(), result.getTotal());
+    String name = StringUtils.hasText(keyword) ? keyword.trim() : null;
+    Specification<Shop> spec =
+        (shop, query, cb) -> {
+          List<Predicate> where = new ArrayList<>();
+          if (typeId != null) {
+            where.add(cb.equal(shop.get("typeId"), typeId));
+          }
+          if (name != null) {
+            where.add(cb.like(shop.get("name"), "%" + name + "%"));
+          }
+          query.orderBy(
+              "price".equals(sort) ? cb.asc(shop.get("avgPrice")) : cb.desc(shop.get("score")),
+              cb.asc(shop.get("id")));
+          return cb.and(where.toArray(new Predicate[0]));
+        };
+    Page<Shop> result = shopRepository.findAll(spec, PageRequest.of(page - 1, size));
+    return Result.ok(result.getContent(), result.getTotalElements());
   }
 
   @Override
@@ -331,18 +438,14 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
   @Override
   public Result listAreas() {
     List<String> areas =
-        list(new QueryWrapper<Shop>().select("DISTINCT area").isNotNull("area").ne("area", ""))
-            .stream()
-            .map(Shop::getArea)
-            .sorted()
-            .collect(Collectors.toList());
+        shopRepository.selectDistinctAreas().stream().sorted().collect(Collectors.toList());
     return Result.ok(areas);
   }
 
   @Override
   public Result saveShop(Shop shop) {
     // 写入数据库
-    save(shop);
+    shopRepository.insert(shop);
     // 返回店铺id
     return Result.ok(shop.getId());
   }
@@ -350,12 +453,13 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
   @Override
   public Result queryShopByName(String name, Integer current) {
     // 根据类型分页查询
+    Specification<Shop> byName =
+        (shop, query, cb) ->
+            StringUtils.hasText(name) ? cb.like(shop.get("name"), "%" + name + "%") : null;
     Page<Shop> page =
-        query()
-            .like(StringUtils.hasText(name), "name", name)
-            .page(new Page<>(current, SystemConstants.MAX_PAGE_SIZE));
+        shopRepository.findAll(byName, pageOf(current, SystemConstants.MAX_PAGE_SIZE));
     // 返回数据
-    return Result.ok(page.getRecords());
+    return Result.ok(page.getContent());
   }
 
   @Override

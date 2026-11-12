@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import com.hmdp.dto.UserDTO;
-import com.hmdp.mapper.BusinessOutboxMapper;
+import com.hmdp.repository.BusinessOutboxRepository;
 import com.hmdp.service.impl.BusinessOutboxServiceImpl;
 import com.hmdp.service.impl.OutboxRelayServiceImpl;
 import com.hmdp.service.impl.SeckillServiceImpl;
@@ -42,7 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class KafkaBusinessIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
-  @Autowired BusinessOutboxMapper businessOutboxMapper;
+  @Autowired BusinessOutboxRepository businessOutboxRepository;
   @Autowired TransactionTemplate transactions;
   @Autowired BusinessOutboxServiceImpl outbox;
   @Autowired OutboxRelayServiceImpl relay;
@@ -92,7 +92,7 @@ class KafkaBusinessIntegrationTest extends IntegrationTestBase {
           return null;
         });
     long id = jdbc.queryForObject("SELECT MAX(id) FROM tb_business_outbox", Long.class);
-    BusinessEvent event = BusinessEvent.from(businessOutboxMapper.selectEventById(id));
+    BusinessEvent event = BusinessEvent.from(businessOutboxRepository.selectEventById(id));
     for (int i = 0; i < 5; i++) {
       transport.publish(event);
     }
@@ -232,7 +232,7 @@ class KafkaBusinessIntegrationTest extends IntegrationTestBase {
             "SELECT id FROM tb_business_outbox WHERE idempotency_key=?",
             Long.class,
             "seckill:" + order);
-    transport.publish(BusinessEvent.from(businessOutboxMapper.selectEventById(event)));
+    transport.publish(BusinessEvent.from(businessOutboxRepository.selectEventById(event)));
     assertEquals(
         1L,
         jdbc.queryForObject("SELECT COUNT(*) FROM tb_voucher_order WHERE id=?", Long.class, order));
@@ -251,7 +251,7 @@ class KafkaBusinessIntegrationTest extends IntegrationTestBase {
           return null;
         });
     long id = jdbc.queryForObject("SELECT MAX(id) FROM tb_business_outbox", Long.class);
-    BusinessEvent forged = BusinessEvent.from(businessOutboxMapper.selectEventById(id));
+    BusinessEvent forged = BusinessEvent.from(businessOutboxRepository.selectEventById(id));
     forged.setAggregateId(916021);
     transport.publish(forged);
     await(

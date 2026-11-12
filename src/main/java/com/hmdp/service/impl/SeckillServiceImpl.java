@@ -7,11 +7,11 @@ import com.hmdp.entity.SeckillPublication;
 import com.hmdp.entity.SeckillReservation;
 import com.hmdp.entity.VoucherOrder;
 import com.hmdp.enums.ReservationState;
-import com.hmdp.mapper.BusinessOutboxMapper;
-import com.hmdp.mapper.SeckillReservationMapper;
-import com.hmdp.mapper.SeckillVoucherMapper;
-import com.hmdp.mapper.VoucherOrderMapper;
 import com.hmdp.reliability.RedisScripts;
+import com.hmdp.repository.BusinessOutboxRepository;
+import com.hmdp.repository.SeckillReservationRepository;
+import com.hmdp.repository.SeckillVoucherRepository;
+import com.hmdp.repository.VoucherOrderRepository;
 import com.hmdp.service.ISeckillService;
 import com.hmdp.service.IVoucherOrderService;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -79,16 +79,16 @@ public class SeckillServiceImpl implements ISeckillService {
   private ObjectMapper objectMapper;
 
   @Resource
-  private BusinessOutboxMapper businessOutboxMapper;
+  private BusinessOutboxRepository businessOutboxRepository;
 
   @Resource
-  private SeckillReservationMapper seckillReservationMapper;
+  private SeckillReservationRepository seckillReservationRepository;
 
   @Resource
-  private SeckillVoucherMapper seckillVoucherMapper;
+  private SeckillVoucherRepository seckillVoucherRepository;
 
   @Resource
-  private VoucherOrderMapper voucherOrderMapper;
+  private VoucherOrderRepository voucherOrderRepository;
 
   private final String consumer = "worker-" + UUID.randomUUID();
   private final StringRedisTemplate redis;
@@ -162,19 +162,19 @@ public class SeckillServiceImpl implements ISeckillService {
             });
     // Auto-publish only never-used activities; missing Redis state for a used activity fails
     // closed.
-    for (Map<String, Object> row : seckillVoucherMapper.selectPublicationStates()) {
+    for (Map<String, Object> row : seckillVoucherRepository.selectPublicationStates()) {
       long id = ((Number) row.get("voucher_id")).longValue();
       if (row.get("has_published") == null) {
         log.warn("活动 {} 缺少持久化发布基线，保持入口关闭并等待人工核对", id);
         continue;
       }
       if ("ACTIVE".equals(redis.opsForHash().get("seckill:activity:" + id, "state"))) {
-        seckillVoucherMapper.markPublished(id);
+        seckillVoucherRepository.markPublished(id);
         continue;
       }
       if (((Number) row.get("has_published")).intValue() == 0
           && !Boolean.TRUE.equals(redis.hasKey("seckill:activity:" + id))
-          && seckillReservationMapper.countByVoucherId(id) == 0
+          && seckillReservationRepository.countByVoucherId(id) == 0
           && Boolean.TRUE.equals(redis.opsForStream().size(STREAM) == 0)) {
         publishActivity(id);
       }
@@ -243,7 +243,7 @@ public class SeckillServiceImpl implements ISeckillService {
     pendingSize.set(redis.opsForStream().pending(STREAM, GROUP).getTotalPendingMessages());
     Long lag = redis.execute(STREAM_LAG, Collections.singletonList(STREAM), GROUP);
     streamLag.set(lag == null ? -1 : lag);
-    reviewSize.set(seckillReservationMapper.countReviewRequests());
+    reviewSize.set(seckillReservationRepository.countReviewRequests());
   }
 
   private void reclaimPending() {
@@ -326,8 +326,9 @@ public class SeckillServiceImpl implements ISeckillService {
     } catch (RuntimeException e) {
       metrics.counter("hmdp.seckill.deliveries", "result", "retry").increment();
       if (reservationMatched) {
-        seckillReservationMapper.recordAttempt(summarizeFailureReason(e), order.getId());
-        SeckillReservation reservation = seckillReservationMapper.selectAttemptState(order.getId());
+        seckillReservationRepository.recordAttempt(summarizeFailureReason(e), order.getId());
+        SeckillReservation reservation =
+            seckillReservationRepository.selectAttemptState(order.getId());
         if (reservation != null) {
           String state = reservation.getState();
           if (!ReservationState.PROCESSING.matches(state)) {
@@ -336,8 +337,8 @@ public class SeckillServiceImpl implements ISeckillService {
             final long id = order.getId();
             transactions.execute(
                 status -> {
-                  seckillReservationMapper.selectStateForUpdate(id);
-                  if (seckillReservationMapper.markProcessingForReview(
+                  seckillReservationRepository.selectStateForUpdate(id);
+                  if (seckillReservationRepository.markProcessingForReview(
                           summarizeFailureReason(e), id)
                       > 0) {
                     saveDeadLetter(record, id, e);
@@ -389,7 +390,7 @@ public class SeckillServiceImpl implements ISeckillService {
 
   private void saveDeadLetter(
       MapRecord<String, Object, Object> record, Long orderId, RuntimeException e) {
-    seckillReservationMapper.insertDeadLetter(
+    seckillReservationRepository.insertDeadLetter(
         record.getId().getValue(), orderId, toJson(record.getValue()), summarizeFailureReason(e));
   }
 
@@ -436,10 +437,10 @@ public class SeckillServiceImpl implements ISeckillService {
   private void enqueueFulfillmentTask(VoucherOrder order) {
     transactions.execute(
         tx -> {
-          businessOutboxMapper.insertSeckillFulfillment(
+          businessOutboxRepository.insertSeckillFulfillment(
               order.getId(), order.getUserId(), "seckill:" + order.getId());
           // An explicit reservation retry can re-publish the same quarantined event.
-          businessOutboxMapper.retryFulfillment("seckill:" + order.getId());
+          businessOutboxRepository.retryFulfillment("seckill:" + order.getId());
           return null;
         });
     metrics.counter("hmdp.seckill.handoffs", "result", "durable").increment();
@@ -452,7 +453,7 @@ public class SeckillServiceImpl implements ISeckillService {
    */
   @Override
   public void fulfillReservationFromMessage(long orderId) {
-    SeckillReservation reservation = seckillReservationMapper.selectFulfillment(orderId);
+    SeckillReservation reservation = seckillReservationRepository.selectFulfillment(orderId);
     if (reservation == null) {
       throw new IllegalStateException("缺少持久化抢购资格");
     }
@@ -491,9 +492,9 @@ public class SeckillServiceImpl implements ISeckillService {
    * <p>INSERT IGNORE 只避免重复写入，不能证明消息身份正确；冲突消息必须单独隔离。
    */
   private void registerAndValidateReservation(VoucherOrder order) {
-    seckillReservationMapper.insertReservation(
+    seckillReservationRepository.insertReservation(
         order.getId(), order.getVoucherId(), order.getUserId());
-    SeckillReservation reservation = seckillReservationMapper.selectReservation(order.getId());
+    SeckillReservation reservation = seckillReservationRepository.selectReservation(order.getId());
     if (reservation == null
         || !reservation.getVoucherId().equals(order.getVoucherId())
         || !reservation.getUserId().equals(order.getUserId())) {
@@ -508,7 +509,8 @@ public class SeckillServiceImpl implements ISeckillService {
    */
   @Override
   public boolean lockReservationForFulfillment(VoucherOrder order) {
-    SeckillReservation reservation = seckillReservationMapper.selectStateForUpdate(order.getId());
+    SeckillReservation reservation =
+        seckillReservationRepository.selectStateForUpdate(order.getId());
     if (reservation == null) {
       throw new IllegalStateException("缺少持久化抢购资格");
     }
@@ -529,17 +531,18 @@ public class SeckillServiceImpl implements ISeckillService {
    */
   @Override
   public void markReservationSuccessful(long orderId) {
-    seckillReservationMapper.markSuccess(orderId);
+    seckillReservationRepository.markSuccess(orderId);
   }
 
   @Override
   public String queryReservationState(long orderId) {
-    return seckillReservationMapper.selectState(orderId);
+    return seckillReservationRepository.selectState(orderId);
   }
 
   @Override
   public Result queryReservationStatus(long orderId, long userId) {
-    List<Map<String, Object>> rows = seckillReservationMapper.selectOwnedRequest(orderId, userId);
+    List<Map<String, Object>> rows =
+        seckillReservationRepository.selectOwnedRequest(orderId, userId);
     if (!rows.isEmpty()) {
       rows.get(0).put("order_id", String.valueOf(orderId));
       return Result.ok(rows.get(0));
@@ -574,7 +577,7 @@ public class SeckillServiceImpl implements ISeckillService {
       return Result.fail("活动正在准备");
     }
     try {
-      SeckillPublication activity = seckillVoucherMapper.selectPublicationDetails(voucherId);
+      SeckillPublication activity = seckillVoucherRepository.selectPublicationDetails(voucherId);
       if (activity == null) {
         return Result.fail("活动不存在");
       }
@@ -588,7 +591,7 @@ public class SeckillServiceImpl implements ISeckillService {
       if (recovering && hasUnfinishedActivityWork(voucherId)) {
         return Result.fail("仍有在途或待核对请求，活动保持暂停，请先处理");
       }
-      if (!recovering && seckillReservationMapper.countByVoucherId(voucherId) > 0) {
+      if (!recovering && seckillReservationRepository.countByVoucherId(voucherId) > 0) {
         return Result.fail("已有抢购记录，请走核对恢复流程");
       }
       rebuildBuyerIndex(voucherId);
@@ -607,7 +610,7 @@ public class SeckillServiceImpl implements ISeckillService {
     if ("ACTIVE".equals(redis.opsForHash().get(activityKey, "state"))) {
       return Result.ok();
     }
-    if (seckillVoucherMapper.selectPublishedFlag(voucherId) == 1) {
+    if (seckillVoucherRepository.selectPublishedFlag(voucherId) == 1) {
       return Result.fail("已发布活动的执行状态缺失，请先核对并恢复");
     }
     long buyers =
@@ -626,7 +629,7 @@ public class SeckillServiceImpl implements ISeckillService {
     boolean unreadMessages = hasUnreadStreamMessages();
     return !pending.isEmpty()
         || unreadMessages
-        || seckillReservationMapper.countUnfinishedRequests(voucherId) > 0;
+        || seckillReservationRepository.countUnfinishedRequests(voucherId) > 0;
   }
 
   private boolean hasUnreadStreamMessages() {
@@ -644,7 +647,8 @@ public class SeckillServiceImpl implements ISeckillService {
   }
 
   private void rebuildBuyerIndex(long voucherId) {
-    List<Map<String, Object>> buyers = seckillReservationMapper.selectSuccessfulBuyers(voucherId);
+    List<Map<String, Object>> buyers =
+        seckillReservationRepository.selectSuccessfulBuyers(voucherId);
     redis.delete(Arrays.asList("seckill:order:" + voucherId, "seckill:requests:" + voucherId));
     for (Map<String, Object> buyer : buyers) {
       String userId = buyer.get("user_id").toString();
@@ -663,7 +667,7 @@ public class SeckillServiceImpl implements ISeckillService {
     config.put("begin", String.valueOf(activity.getBeginTime().getTime()));
     config.put("end", String.valueOf(activity.getEndTime().getTime()));
     config.put("state", Integer.valueOf(1).equals(activity.getStatus()) ? "ACTIVE" : "PAUSED");
-    seckillVoucherMapper.markPublished(activity.getVoucherId());
+    seckillVoucherRepository.markPublished(activity.getVoucherId());
     redis.opsForHash().putAll(activityKey, config);
   }
 
@@ -677,12 +681,12 @@ public class SeckillServiceImpl implements ISeckillService {
     return transactions.execute(
         tx -> {
           SeckillReservation reservation =
-              seckillReservationMapper.selectReservationForUpdate(orderId);
+              seckillReservationRepository.selectReservationForUpdate(orderId);
           if (reservation == null || !ReservationState.REVIEW.matches(reservation.getState())) {
             return Result.fail("请求不在待核对状态");
           }
-          seckillReservationMapper.resetForRetry(orderId);
-          businessOutboxMapper.insertSeckillRetry(orderId);
+          seckillReservationRepository.resetForRetry(orderId);
+          businessOutboxRepository.insertSeckillRetry(orderId);
           return Result.ok();
         });
   }
@@ -700,7 +704,7 @@ public class SeckillServiceImpl implements ISeckillService {
         transactions.execute(
             tx -> {
               SeckillReservation reservation =
-                  seckillReservationMapper.selectReservationForUpdate(orderId);
+                  seckillReservationRepository.selectReservationForUpdate(orderId);
               if (reservation == null) {
                 return Result.fail("请求不存在");
               }
@@ -708,10 +712,10 @@ public class SeckillServiceImpl implements ISeckillService {
                   && !ReservationState.REVIEW.matches(reservation.getState())) {
                 return Result.fail("仅能处理已隔离的失败请求");
               }
-              if (voucherOrderMapper.countByOrderId(orderId) > 0) {
+              if (voucherOrderRepository.countByOrderId(orderId) > 0) {
                 return Result.fail("订单已经落库，不能回补库存");
               }
-              seckillReservationMapper.markFailed(orderId);
+              seckillReservationRepository.markFailed(orderId);
               return Result.ok(reservation);
             });
     if (!Boolean.TRUE.equals(result.getSuccess())) {
@@ -744,15 +748,16 @@ public class SeckillServiceImpl implements ISeckillService {
   public Result queryInventoryReconciliationReport(long voucherId) {
     Map<String, Object> report = new LinkedHashMap<>();
     report.put("voucher_id", voucherId);
-    List<Map<String, Object>> inventoryRows = seckillVoucherMapper.selectInventory(voucherId);
+    List<Map<String, Object>> inventoryRows = seckillVoucherRepository.selectInventory(voucherId);
     if (inventoryRows.isEmpty()) {
       return Result.fail("活动不存在");
     }
     long initialStock = ((Number) inventoryRows.get(0).get("total_stock")).longValue();
     long databaseRemainingStock = ((Number) inventoryRows.get(0).get("stock")).longValue();
 
-    long persistedOrderCount = voucherOrderMapper.countByVoucherId(voucherId);
-    long unresolvedReservationCount = seckillReservationMapper.countUnfinishedRequests(voucherId);
+    long persistedOrderCount = voucherOrderRepository.countByVoucherId(voucherId);
+    long unresolvedReservationCount =
+        seckillReservationRepository.countUnfinishedRequests(voucherId);
     String redisRemainingStock = redis.opsForValue().get("seckill:stock:" + voucherId);
     report.put("initial_stock", initialStock);
     report.put("database_remaining", databaseRemainingStock);
@@ -781,7 +786,7 @@ public class SeckillServiceImpl implements ISeckillService {
 
   @Scheduled(fixedDelay = 60000)
   public void checkActivityInventoryConsistency() {
-    for (Long id : seckillVoucherMapper.selectActivityVoucherIds()) {
+    for (Long id : seckillVoucherRepository.selectActivityVoucherIds()) {
       try {
         @SuppressWarnings("unchecked")
         Map<String, Object> report =
@@ -797,7 +802,7 @@ public class SeckillServiceImpl implements ISeckillService {
 
   @Override
   public Result queryReservationsForReview() {
-    return Result.ok(seckillReservationMapper.selectReviewRequests());
+    return Result.ok(seckillReservationRepository.selectReviewRequests());
   }
 
   private enum PublicationMode {
