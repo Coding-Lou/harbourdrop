@@ -46,11 +46,6 @@ groups:
         for: 1m
         labels: {severity: critical}
         annotations: {summary: "Canal 服务不可达"}
-      - alert: CacheMemcacheFailure
-        expr: sum(rate(hmdp_memcache_operations_total{result="error"}[5m])) > 0.1
-        for: 1m
-        labels: {severity: warning}
-        annotations: {summary: "Memcache 故障，读取正在回退 Redis"}
       - alert: CacheCdcDisconnected
         expr: (max(hmdp_cdc_connected) == 0) and (max(hmdp_cdc_enabled) == 1)
         for: 1m

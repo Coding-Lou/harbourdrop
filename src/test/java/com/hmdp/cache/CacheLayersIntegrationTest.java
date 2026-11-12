@@ -3,7 +3,6 @@ package com.hmdp.cache;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -34,7 +33,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -42,7 +40,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 class CacheLayersIntegrationTest extends IntegrationTestBase {
   @Autowired StringRedisTemplate redis;
   @Autowired JdbcTemplate jdbc;
-  @Autowired MemcacheStore shared;
   @Autowired CacheClient serviceCache;
   @Autowired TestRestTemplate http;
   @Autowired IVoucherService vouchers;
@@ -51,20 +48,12 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
   private String prefix;
 
   @BeforeEach
-  void init() throws InterruptedException {
+  void init() {
     assertEquals("hmdp_optimization_test", jdbc.queryForObject("SELECT DATABASE()", String.class));
     prefix = "test:layers:" + UUID.randomUUID() + ":";
-    cache = new CacheClient(redis, shared);
+    cache = new CacheClient(redis);
     registry = new SimpleMeterRegistry();
     cache.bindMetrics(registry);
-    // A previous context may have just closed its client. Wait for this client's
-    // real connection before asserting short TTLs or cross-client cache hits.
-    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-    while (!shared.put(
-        prefix + "ready", "0", new CacheSnapshot("{}", System.currentTimeMillis() + 10000, true))) {
-      assertTrue(System.nanoTime() < deadline, "隔离 Memcache 未在 5 秒内就绪");
-      Thread.sleep(100);
-    }
   }
 
   @AfterEach
@@ -94,7 +83,7 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  void scopeLocalSharedAndRedisServeImmutableCopies() {
+  void scopeLocalAndRedisServeImmutableCopies() {
     AtomicInteger loads = new AtomicInteger();
     try (RequestCacheScope scope = RequestCacheScope.open()) {
       read(cache, loads).setName("mutated");
@@ -115,7 +104,8 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
             .tags("layer", "jvm", "result", "hit")
             .counter()
             .count());
-    CacheClient peer = new CacheClient(redis, shared);
+    // A second application instance has a cold JVM cache and is served by Redis, not MySQL.
+    CacheClient peer = new CacheClient(redis);
     SimpleMeterRegistry peerMetrics = new SimpleMeterRegistry();
     peer.bindMetrics(peerMetrics);
     try {
@@ -124,19 +114,13 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
           1,
           peerMetrics
               .get("hmdp.cache.requests")
-              .tags("layer", "memcache", "result", "hit")
+              .tags("layer", "redis", "result", "hit")
               .counter()
               .count());
+      assertEquals(1, loads.get());
     } finally {
       peer.close();
       peerMetrics.close();
-    }
-    CacheClient redisOnly = new CacheClient(redis);
-    try {
-      assertEquals("database", read(redisOnly, loads).getName());
-      assertEquals(1, loads.get());
-    } finally {
-      redisOnly.close();
     }
   }
 
@@ -197,7 +181,6 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
       finish.countDown();
       old.get(5, TimeUnit.SECONDS);
       assertNull(redis.opsForValue().get(prefix + 1));
-      assertNull(shared.get(prefix + 1, redis.opsForValue().get(prefix + "1:version")));
       assertEquals("database", read(cache, loads).getName());
     } finally {
       finish.countDown();
@@ -206,23 +189,13 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  void versionNamespaceRejectsOldSharedValueAndTtlDoesNotExtendSourceLifetime() throws Exception {
+  void invalidationBumpsVersionAndDropsStaleRedisValue() {
     String key = prefix + 1;
-    String revision = "0";
-    assertTrue(
-        shared.put(
-            key,
-            revision,
-            new CacheSnapshot(
-                "{\"id\":1,\"name\":\"stale\"}", System.currentTimeMillis() + 200, true)));
-    Thread.sleep(260);
-    assertNull(shared.get(key, revision));
-    assertTrue(
-        shared.put(
-            key,
-            revision,
-            new CacheSnapshot("{\"id\":1,\"name\":\"stale\"}", Long.MAX_VALUE, true)));
+    redis.opsForValue().set(key, "{\"id\":1,\"name\":\"stale\"}", 1, TimeUnit.MINUTES);
+    String before = redis.opsForValue().get(key + ":version");
     cache.invalidate(key);
+    assertNotEquals(before, redis.opsForValue().get(key + ":version"));
+    assertNull(redis.opsForValue().get(key));
     AtomicInteger loads = new AtomicInteger();
     assertEquals("database", read(cache, loads).getName());
     assertEquals(1, loads.get());
@@ -238,34 +211,6 @@ class CacheLayersIntegrationTest extends IntegrationTestBase {
     assertNull(redis.opsForValue().get(prefix + 1));
     assertEquals("database", read(cache, loads).getName());
     assertEquals(2, loads.get());
-  }
-
-  @Test
-  void unavailableMemcacheFallsBackWithinBoundAndKeepsRedisData() {
-    MemcacheStore broken = new MemcacheStore();
-    ReflectionTestUtils.setField(broken, "enabled", true);
-    ReflectionTestUtils.setField(broken, "host", "127.0.0.1");
-    ReflectionTestUtils.setField(broken, "port", 1);
-    ReflectionTestUtils.setField(broken, "timeoutMillis", 40L);
-    ReflectionTestUtils.setField(broken, "metrics", registry);
-    CacheClient fallback = new CacheClient(redis, broken);
-    redis.opsForValue().set(prefix + 1, "{\"id\":1,\"name\":\"redis\"}", 1, TimeUnit.MINUTES);
-    try {
-      long began = System.nanoTime();
-      assertEquals("redis", read(fallback, new AtomicInteger()).getName());
-      assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began) < 2000);
-      assertEquals(
-          1,
-          registry
-              .get("hmdp.memcache.operations")
-              .tags("operation", "get", "result", "error")
-              .counter()
-              .count());
-      assertNotNull(redis.opsForValue().get(prefix + 1));
-    } finally {
-      fallback.close();
-      broken.close();
-    }
   }
 
   @Test

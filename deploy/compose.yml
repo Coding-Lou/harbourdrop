@@ -47,12 +47,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-  memcached:
-    image: memcached:1.6-alpine
-    restart: unless-stopped
-    mem_limit: 64m
-    logging: *logging
-    command: [memcached, -m, '32', -I, 2m]
   image-init:
     image: nginx:alpine
     mem_limit: 64m
@@ -82,8 +76,6 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: '6379'
       SPRING_DATA_REDIS_PASSWORD: ${HMDP_REDIS_PASSWORD:?Run init-env.sh first}
-      HMDP_MEMCACHE_ENABLED: 'true'
-      HMDP_MEMCACHE_HOST: memcached
       HMDP_CDC_ENABLED: 'false'
       HMDP_MQ_ENABLED: 'false'
       HMDP_MQ_SECKILL_ENABLED: 'false'
@@ -102,8 +94,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      memcached:
-        condition: service_started
       image-init:
         condition: service_completed_successfully
   web:

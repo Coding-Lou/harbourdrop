@@ -4,7 +4,7 @@
 
 ## 1. 这套部署运行什么
 
-运行 Nginx 桌面网页、Java、MySQL、Redis、Memcache。后端使用当前源码编译的可执行 JAR，前端使用当前 `frontend` 静态页面，所有网页请求仍走同域 `/api`。
+运行 Nginx 桌面网页、Java、MySQL、Redis。后端使用当前源码编译的可执行 JAR，前端使用当前 `frontend` 静态页面，所有网页请求仍走同域 `/api`。
 
 登录、店铺/搜索、签到、社区、普通券与订单、缓存采样可以体验。秒杀需要管理员准备并发布活动，走 Redis Stream 和本地履约。持久 Outbox/Inbox 仍用于本地投影。免费券的“已领取”状态不表示真实收款，模拟支付默认关闭。
 
@@ -72,7 +72,7 @@ curl -i 'http://127.0.0.1:8080/api/shop-type/list'
 
 `image-init` 的 Exited(0) 表示初始图片复制完成，是正常状态。复制不覆盖已有同路径图片，后续上传数据保存在 uploads 卷。web 的健康检查经过 `/api/actuator/health`，等待 Java 启动后才能 healthy。
 
-网页端口为 `0.0.0.0:8080`；Java 8081 仅绑定服务器本机；MySQL、Redis、Memcache不发布宿主端口。公网访问通过 Nginx，管理运维 `/api/ops/` 和 Prometheus 路由不在该入口公开。Nginx 重写 X-Forwarded-For，Java按 native策略恢复访客地址，避免所有人被简单当成同一个代理 IP限流。
+网页端口为 `0.0.0.0:8080`；Java 8081 仅绑定服务器本机；MySQL、Redis 不发布宿主端口。公网访问通过 Nginx，管理运维 `/api/ops/` 和 Prometheus 路由不在该入口公开。Nginx 重写 X-Forwarded-For，Java按 native策略恢复访客地址，避免所有人被简单当成同一个代理 IP限流。
 
 ## 5. 阿里云安全组开放网页端口
 
@@ -158,7 +158,7 @@ df -h /
 docker compose --env-file .env -f compose.yml logs --tail=100 mysql java web
 ```
 
-Java堆上限 256MB，容器上限512MB；MySQL上限512MB并缩小缓冲区，Redis上限192MB且禁用自动淘汰业务 Key，Memcache上限64MB，Nginx上限64MB。这是初始体验预算，应用的原生内存、线程、数据库初始化峰值和宿主进程都要算在内。
+Java堆上限 256MB，容器上限512MB；MySQL上限512MB并缩小缓冲区，Redis上限192MB且禁用自动淘汰业务 Key，Nginx上限64MB。这是初始体验预算，应用的原生内存、线程、数据库初始化峰值和宿主进程都要算在内。
 
 如果容器重启，检查是否 OOMKilled，不先用反复重启掩盖。Redis达到 maxmemory后会拒绝新增写入，不能为腾空间使用 FLUSHALL或随机删秒杀/签到数据。进一步并发演示、全部中间件或更大数据量需要重新评估资源，本文件不保证2GB可以承载所有亮点与压测。
 

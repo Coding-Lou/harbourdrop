@@ -58,23 +58,14 @@ public abstract class IntegrationTestBase {
   protected static final KafkaContainer KAFKA =
       new KafkaContainer(DockerImageName.parse("apache/kafka:3.9.1"));
 
-  protected static final GenericContainer<?> MEMCACHED =
-      new GenericContainer<>(DockerImageName.parse("memcached:1.6-alpine"))
-          .withCommand("memcached", "-m", "64", "-I", "2m")
-          .withExposedPorts(11211);
-
   static {
-    Startables.deepStart(MYSQL, REDIS, KAFKA, MEMCACHED).join();
+    Startables.deepStart(MYSQL, REDIS, KAFKA).join();
     createTopics(List.of(new NewTopic(BEHAVIOR_TOPIC, 3, (short) 1)));
   }
 
   @DynamicPropertySource
   static void infrastructureProperties(DynamicPropertyRegistry registry) {
     registry.add("hmdp.analytics.bootstrap-servers", KAFKA::getBootstrapServers);
-    registry.add("hmdp.memcache.enabled", () -> "true");
-    registry.add("hmdp.memcache.host", MEMCACHED::getHost);
-    registry.add("hmdp.memcache.port", () -> MEMCACHED.getMappedPort(11211));
-    registry.add("hmdp.memcache.timeout-ms", () -> "1000");
     registry.add("hmdp.cdc.schema", () -> DATABASE);
     registry.add("citylens.catalog-admin-ids", () -> "1010");
     registry.add("citylens.payment.mock-enabled", () -> "true");

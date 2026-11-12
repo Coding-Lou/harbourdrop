@@ -81,11 +81,6 @@ hmdp:
   monitor-token: ${HMDP_MONITOR_TOKEN:}
   cache:
     enabled: true
-  memcache:
-    enabled: ${HMDP_MEMCACHE_ENABLED:false}
-    host: ${HMDP_MEMCACHE_HOST:127.0.0.1}
-    port: ${HMDP_MEMCACHE_PORT:11211}
-    timeout-ms: 100
   cdc:
     enabled: ${HMDP_CDC_ENABLED:false}
     host: ${HMDP_CDC_HOST:127.0.0.1}

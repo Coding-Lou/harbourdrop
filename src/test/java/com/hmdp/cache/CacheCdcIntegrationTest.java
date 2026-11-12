@@ -33,7 +33,6 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired StringRedisTemplate redis;
   @Autowired CacheClient cache;
-  @Autowired MemcacheStore shared;
   @Autowired MeterRegistry metrics;
   @Autowired SeckillServiceImpl seckill;
   @Autowired ApplicationContext context;
@@ -47,7 +46,7 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
   }
 
   @Test
-  void externalSqlWarmsCurrentValueAndMakesOldMemcacheNamespaceUnreachable() throws Exception {
+  void externalSqlInvalidatesAndWarmsCurrentValueInRedis() throws Exception {
     await(() -> metrics.get("hmdp.cdc.connected").gauge().value() == 1);
     long id = 900201;
     String old = "cdc-old";
@@ -70,7 +69,7 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
         () ->
             !before.equals(version(id))
                 && fresh.equals(read(id).getName())
-                && shared.get("cache:shop:" + id, version(id)) != null);
+                && redis.opsForValue().get("cache:shop:" + id) != null);
     // Warming happens before the batch audit commits; wait for the independent durable
     // checkpoint.
     await(
@@ -80,7 +79,7 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
                         + "destination='example' AND binlog_offset>0",
                     Long.class)
                 > 0);
-    CacheClient peer = new CacheClient(redis, shared);
+    CacheClient peer = new CacheClient(redis);
     try {
       Shop value =
           peer.queryWithMutex(
@@ -154,8 +153,8 @@ class CacheCdcIntegrationTest extends IntegrationTestBase {
         name);
     await(
         () -> {
-          CacheSnapshot value = shared.get("cache:shop:" + id, version(id));
-          return value != null && value.json.contains(name);
+          String value = redis.opsForValue().get("cache:shop:" + id);
+          return value != null && value.contains(name);
         });
     jdbc.update("DELETE FROM tb_shop WHERE id=?", id);
   }

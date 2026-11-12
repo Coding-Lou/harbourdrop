@@ -110,9 +110,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-  memcached:
-    image: memcached:1.6-alpine
-    command: [memcached, -m, '64', -I, 2m]
   canal:
     image: canal/canal-server:v1.1.8
     platform: linux/amd64
@@ -142,8 +139,6 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: '6379'
       SPRING_DATA_REDIS_PASSWORD: ''
-      HMDP_MEMCACHE_ENABLED: 'true'
-      HMDP_MEMCACHE_HOST: memcached
       HMDP_CDC_ENABLED: 'true'
       HMDP_CDC_HOST: canal
       HMDP_CDC_SCHEMA: hmdp
@@ -168,8 +163,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      memcached:
-        condition: service_started
       canal:
         condition: service_started
       mq-init:

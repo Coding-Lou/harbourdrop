@@ -75,7 +75,7 @@ class CacheBenchmarkIntegrationTest extends IntegrationTestBase {
       report.put("optimized", phase(true));
       report.put(
           "scope",
-          "Isolated Docker MySQL 8 / Redis 7 / Memcached 1.6. One Java instance; "
+          "Testcontainers MySQL 8 / Redis 7. One Java instance; "
               + "warm hot-key HTTP test, not a production capacity claim.");
       Files.createDirectories(Paths.get("docs"));
       new ObjectMapper()

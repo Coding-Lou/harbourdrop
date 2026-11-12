@@ -1,7 +1,6 @@
 export const cacheLayers = [
   { key: "scope", name: "请求内缓存" },
   { key: "jvm", name: "Caffeine" },
-  { key: "memcache", name: "Memcache" },
   { key: "redis", name: "Redis" },
   { key: "mysql", name: "MySQL" },
 ];

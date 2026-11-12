@@ -7,7 +7,6 @@ import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.hmdp.cache.CacheReadTrace;
 import com.hmdp.cache.CacheSnapshot;
-import com.hmdp.cache.MemcacheStore;
 import com.hmdp.cache.RequestCacheScope;
 import com.hmdp.reliability.RedisScripts;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -44,7 +43,6 @@ public class CacheClient {
   private static final int RETRY_BASE_MILLIS = 20;
   private static final int RETRY_JITTER_MILLIS = 20;
   private final StringRedisTemplate redis;
-  private final MemcacheStore shared;
   private final AtomicLong generation = new AtomicLong();
   private final LoadingCache<LoadRequest, CacheSnapshot> local =
       Caffeine.newBuilder()
@@ -76,13 +74,7 @@ public class CacheClient {
   private MeterRegistry metrics;
 
   public CacheClient(StringRedisTemplate redis) {
-    this(redis, new MemcacheStore());
-  }
-
-  @Autowired
-  public CacheClient(StringRedisTemplate redis, MemcacheStore shared) {
     this.redis = redis;
-    this.shared = shared;
   }
 
   @Autowired
@@ -222,17 +214,8 @@ public class CacheClient {
   }
 
   private CacheSnapshot loadLayers(LoadRequest request) {
-    String key = request.key;
-    String revision = queryCacheVersion(key);
-    CacheSnapshot cached = shared.get(key, revision);
-    if (cached != null && isUsableCachePayload(cached.json)) {
-      recordCacheReadOutcome("memcache", "hit");
-      return cached;
-    }
-    recordCacheReadOutcome("memcache", "miss");
-    cached = readRedisSnapshot(key);
+    CacheSnapshot cached = readRedisSnapshot(request.key);
     if (cached != null) {
-      shared.put(key, revision, cached);
       return cached;
     }
     return awaitOrRebuild(request);
@@ -250,10 +233,8 @@ public class CacheClient {
               .setIfAbsent(lockKey, owner, REBUILD_LOCK_SECONDS, TimeUnit.SECONDS))) {
         return rebuildUnderLock(request, lockKey, owner);
       }
-      String polledVersion = queryCacheVersion(key);
       CacheSnapshot cached = readRedisSnapshot(key);
       if (cached != null) {
-        shared.put(key, polledVersion, cached);
         return cached;
       }
       pauseBeforeRetry();
@@ -264,13 +245,11 @@ public class CacheClient {
   private CacheSnapshot rebuildUnderLock(LoadRequest request, String lockKey, String owner) {
     String key = request.key;
     try {
-      String revision = queryCacheVersion(key);
       CacheSnapshot cached = readRedisSnapshot(key);
       if (cached != null) {
-        shared.put(key, revision, cached);
         return cached;
       }
-      revision = queryCacheVersion(key);
+      String revision = queryCacheVersion(key);
       recordCacheReadOutcome("mysql", "load");
       String json = request.source.get();
       long ttlMillis =
@@ -289,9 +268,7 @@ public class CacheClient {
       CacheSnapshot loaded =
           new CacheSnapshot(
               json, System.currentTimeMillis() + ttlMillis, Long.valueOf(1).equals(written));
-      if (loaded.cacheable) {
-        shared.put(key, revision, loaded);
-      } else {
+      if (!loaded.cacheable) {
         recordCacheReadOutcome("fill", "fenced");
       }
       return loaded;
