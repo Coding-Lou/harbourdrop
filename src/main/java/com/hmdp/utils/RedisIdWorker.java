@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 public class RedisIdWorker {
   /** 开始时间戳 */
   private static final long BEGIN_TIMESTAMP = 1640995200L;
+
   /** 序列号的位数 */
   private static final int COUNT_BITS = 32;
 

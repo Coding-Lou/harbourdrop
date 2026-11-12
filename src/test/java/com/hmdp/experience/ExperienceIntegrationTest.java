@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hmdp.entity.Voucher;
 import com.hmdp.mapper.MessageMapper;
 import com.hmdp.mapper.VoucherMapper;
+import com.hmdp.support.IntegrationTestBase;
 import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
@@ -36,7 +37,7 @@ import org.springframework.test.annotation.DirtiesContext;
       "citylens.reliability.scheduling-enabled=false"
     })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class ExperienceIntegrationTest {
+class ExperienceIntegrationTest extends IntegrationTestBase {
   @Autowired private TestRestTemplate http;
   @Autowired private ObjectMapper json;
   @Autowired private DataSource dataSource;

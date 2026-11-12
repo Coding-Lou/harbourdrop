@@ -33,14 +33,19 @@ public class VoucherOrder implements Serializable {
 
   /** 创建时应付金额，单位分；历史订单为空时兼容读取当前券价。 */
   private Long payValueSnapshot;
+
   /** 创建时券标题；后续改名不应改写该历史快照。 */
   private String titleSnapshot;
+
   /** 创建时使用规则。 */
   private String rulesSnapshot;
+
   /** 创建时券类型，0 普通券、1 秒杀券。 */
   private Integer voucherTypeSnapshot;
+
   /** 普通待支付订单的付款截止时间；免费券或无需关单的订单可为空。 */
   private LocalDateTime expireAt;
+
   /** 创建时所属店铺，用于订单行为分析归属。 */
   private Long shopIdSnapshot;
 

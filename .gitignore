@@ -35,3 +35,4 @@ build/
 ### OS / Node ###
 .DS_Store
 node_modules/
+dev/data/

@@ -24,6 +24,7 @@ import com.hmdp.service.impl.BusinessOutboxServiceImpl;
 import com.hmdp.service.impl.MediaServiceImpl;
 import com.hmdp.service.impl.SeckillServiceImpl;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.SystemConstants;
@@ -56,7 +57,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.context.ApplicationContext;
@@ -83,7 +83,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {"citylens.reliability.scheduling-enabled=false"})
-class ReliabilityIntegrationTest {
+class ReliabilityIntegrationTest extends IntegrationTestBase {
   @Autowired TestRestTemplate http;
   @Autowired JdbcTemplate jdbc;
   @Autowired StringRedisTemplate redis;
@@ -99,8 +99,6 @@ class ReliabilityIntegrationTest {
   @Autowired UploadController uploads;
   @Autowired MediaStorage mediaStorage;
   @Autowired MediaServiceImpl media;
-
-  @Autowired DataSourceProperties datasourceProperties;
 
   private static final long SKU = 900001;
   private static final long OTHER = 900002;
@@ -871,9 +869,9 @@ class ReliabilityIntegrationTest {
     try {
       DriverManagerDataSource source =
           new DriverManagerDataSource(
-              datasourceProperties.getUrl().replace("hmdp_optimization_test", schema),
-              datasourceProperties.getUsername(),
-              datasourceProperties.getPassword());
+              MYSQL.getJdbcUrl().replace(DATABASE, schema),
+              MYSQL.getUsername(),
+              MYSQL.getPassword());
       try (Connection connection = source.getConnection()) {
         ScriptUtils.executeSqlScript(connection, new ClassPathResource("db/hmdp.sql"));
       }

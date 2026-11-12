@@ -2,7 +2,7 @@ package com.hmdp.service.impl;
 
 import com.hmdp.mapper.BehaviorMapper;
 import com.hmdp.service.IBehaviorFailureService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 @Service

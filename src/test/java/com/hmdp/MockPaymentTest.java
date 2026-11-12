@@ -3,7 +3,6 @@ package com.hmdp;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -17,6 +16,7 @@ import com.hmdp.entity.VoucherOrder;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.service.impl.OrderLifecycleServiceImpl;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
+import com.hmdp.support.ChainMocks;
 import com.hmdp.utils.UserHolder;
 import java.io.Serializable;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class MockPaymentTest {
   static class Service extends VoucherOrderServiceImpl {
     VoucherOrder order =
         new VoucherOrder().setId(88L).setUserId(7L).setVoucherId(2001L).setStatus(1);
-    UpdateChainWrapper<VoucherOrder> chain = mock(UpdateChainWrapper.class, RETURNS_SELF);
+    UpdateChainWrapper<VoucherOrder> chain = ChainMocks.fluent(UpdateChainWrapper.class);
 
     @Override
     public VoucherOrder getById(Serializable id) {

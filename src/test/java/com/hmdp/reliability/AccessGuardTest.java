@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.hmdp.dto.UserDTO;
 import com.hmdp.utils.UserHolder;
+import jakarta.servlet.DispatcherType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -83,6 +84,18 @@ class AccessGuardTest {
         guard.preHandle(
             new MockHttpServletRequest("POST", "/ops/seckill/1/publish"), response, new Object()));
     assertEquals(403, response.getStatus());
+  }
+
+  @Test
+  void errorDispatchKeepsTheOriginalStatusInsteadOfAskingForLogin() throws Exception {
+    AccessGuard guard = new AccessGuard(mock(RateLimiter.class));
+    MockHttpServletRequest error = new MockHttpServletRequest("GET", "/error");
+    error.setDispatcherType(DispatcherType.ERROR);
+    assertTrue(guard.preHandle(error, new MockHttpServletResponse(), new Object()));
+    MockHttpServletResponse response = new MockHttpServletResponse();
+    assertFalse(
+        guard.preHandle(new MockHttpServletRequest("GET", "/error"), response, new Object()));
+    assertEquals(401, response.getStatus());
   }
 
   @Test

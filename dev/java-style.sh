@@ -9,12 +9,13 @@ case "$mode" in
   *) echo 'Usage: dev/java-style.sh [check|format]' >&2; exit 2 ;;
 esac
 
-# This version runs on Java 8. Omit --aosp to use Google Java Style.
-formatter_version=1.7
-maven_repo=$(mvn -q help:evaluate -Dexpression=settings.localRepository -DforceStdout)
+# google-java-format 1.37 runs on Java 21. Omit --aosp to use Google Java Style.
+formatter_version=1.37.0
+mvn=./mvnw
+maven_repo=$($mvn -q help:evaluate -Dexpression=settings.localRepository -DforceStdout)
 formatter_jar="$maven_repo/com/google/googlejavaformat/google-java-format/$formatter_version/google-java-format-$formatter_version-all-deps.jar"
 if [ ! -f "$formatter_jar" ]; then
-  mvn -B dependency:get \
+  $mvn -B dependency:get \
     "-Dartifact=com.google.googlejavaformat:google-java-format:$formatter_version:jar:all-deps" \
     -Dtransitive=false
 fi
@@ -30,7 +31,14 @@ while IFS= read -r source_file; do
 done < "$formatted_root/sources"
 
 find "$formatted_root/src" -name '*.java' -type f -print0 \
-  | xargs -0 java -jar "$formatter_jar" --replace
+  | xargs -0 java \
+    --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED \
+    --add-exports=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED \
+    --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED \
+    --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED \
+    --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED \
+    --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED \
+    -jar "$formatter_jar" --replace
 
 layout_failed=0
 while IFS= read -r source_file; do
@@ -53,4 +61,4 @@ if [ "$layout_failed" -ne 0 ]; then
 fi
 
 # Formatting does not fix wildcard imports or multiple-variable declarations.
-mvn -B validate
+$mvn -B validate

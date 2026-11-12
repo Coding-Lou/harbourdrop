@@ -2,7 +2,9 @@ package com.hmdp.utils;
 
 import cn.hutool.core.util.StrUtil;
 
-/** @author 虎哥 */
+/**
+ * @author 虎哥
+ */
 public class RegexUtils {
   /**
    * 是否是无效手机格式
@@ -13,6 +15,7 @@ public class RegexUtils {
   public static boolean isPhoneInvalid(String phone) {
     return mismatch(phone, RegexPatterns.PHONE_REGEX);
   }
+
   /**
    * 是否是无效邮箱格式
    *

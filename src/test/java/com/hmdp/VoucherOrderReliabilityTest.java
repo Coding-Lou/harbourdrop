@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.RETURNS_SELF;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -25,6 +24,7 @@ import com.hmdp.entity.VoucherOrder;
 import com.hmdp.service.ISeckillVoucherService;
 import com.hmdp.service.IVoucherService;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
+import com.hmdp.support.ChainMocks;
 import com.hmdp.utils.UserHolder;
 import java.io.Serializable;
 import org.junit.jupiter.api.Test;
@@ -41,11 +41,11 @@ class VoucherOrderReliabilityTest {
     boolean saveResult = true;
 
     @SuppressWarnings("unchecked")
-    QueryChainWrapper<VoucherOrder> candidates = mock(QueryChainWrapper.class, RETURNS_SELF);
+    QueryChainWrapper<VoucherOrder> candidates = ChainMocks.fluent(QueryChainWrapper.class);
 
     @SuppressWarnings("unchecked")
     LambdaQueryChainWrapper<VoucherOrder> personal =
-        mock(LambdaQueryChainWrapper.class, RETURNS_SELF);
+        ChainMocks.fluent(LambdaQueryChainWrapper.class);
 
     @Override
     public VoucherOrder getById(Serializable id) {
@@ -81,7 +81,7 @@ class VoucherOrderReliabilityTest {
     RedissonClient redis = mock(RedissonClient.class);
     when(redis.getLock(anyString())).thenReturn(lock);
     ISeckillVoucherService stock = mock(ISeckillVoucherService.class);
-    UpdateChainWrapper<SeckillVoucher> update = mock(UpdateChainWrapper.class, RETURNS_SELF);
+    UpdateChainWrapper<SeckillVoucher> update = ChainMocks.fluent(UpdateChainWrapper.class);
     when(stock.update()).thenReturn(update);
     when(update.update()).thenReturn(true);
     IVoucherService vouchers = mock(IVoucherService.class);

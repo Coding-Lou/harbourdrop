@@ -2,7 +2,7 @@ package com.hmdp.service.impl;
 
 import com.hmdp.mapper.CacheCheckpointMapper;
 import com.hmdp.service.ICacheCheckpointService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 @Service

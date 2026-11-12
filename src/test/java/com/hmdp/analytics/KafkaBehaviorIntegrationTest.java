@@ -9,6 +9,7 @@ import com.hmdp.service.IShopHeatService;
 import com.hmdp.service.impl.BehaviorJournalServiceImpl;
 import com.hmdp.service.impl.OutboxRelayServiceImpl;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.UserHolder;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,7 +29,7 @@ import org.springframework.test.annotation.DirtiesContext;
       "hmdp.analytics.group=hmdp-integration-heat"
     })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class KafkaBehaviorIntegrationTest {
+class KafkaBehaviorIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired KafkaBehaviorTransport transport;
   @Autowired BehaviorJournalServiceImpl journal;

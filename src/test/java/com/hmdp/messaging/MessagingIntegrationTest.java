@@ -23,6 +23,7 @@ import com.hmdp.service.impl.BusinessOutboxServiceImpl;
 import com.hmdp.service.impl.OrderLifecycleServiceImpl;
 import com.hmdp.service.impl.OutboxRelayServiceImpl;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.UserHolder;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest(
     properties = {"citylens.reliability.scheduling-enabled=false", "hmdp.mq.enabled=false"})
-class MessagingIntegrationTest {
+class MessagingIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired StringRedisTemplate redis;
   @Autowired BusinessOutboxMapper businessOutboxMapper;

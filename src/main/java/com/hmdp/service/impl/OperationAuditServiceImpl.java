@@ -2,7 +2,7 @@ package com.hmdp.service.impl;
 
 import com.hmdp.mapper.OperationAuditMapper;
 import com.hmdp.service.IOperationAuditService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 @Service

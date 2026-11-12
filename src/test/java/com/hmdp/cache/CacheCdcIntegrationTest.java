@@ -8,11 +8,13 @@ import static org.junit.jupiter.api.Assertions.fail;
 import com.alibaba.otter.canal.client.CanalConnector;
 import com.hmdp.entity.Shop;
 import com.hmdp.service.impl.SeckillServiceImpl;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.CacheClient;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,11 +24,12 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
+@Disabled("Rewritten for Debezium in migration phase 6")
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {"citylens.reliability.scheduling-enabled=false", "hmdp.cdc.enabled=true"})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class CacheCdcIntegrationTest {
+class CacheCdcIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired StringRedisTemplate redis;
   @Autowired CacheClient cache;

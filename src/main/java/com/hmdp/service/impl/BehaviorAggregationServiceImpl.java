@@ -3,10 +3,10 @@ package com.hmdp.service.impl;
 import com.hmdp.analytics.BehaviorEvent;
 import com.hmdp.mapper.BehaviorMapper;
 import com.hmdp.service.IBehaviorAggregationService;
+import jakarta.annotation.Resource;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 

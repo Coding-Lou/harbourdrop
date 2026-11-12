@@ -25,16 +25,21 @@ public class Blog implements Serializable {
   /** 主键 */
   @TableId(value = "id", type = IdType.AUTO)
   private Long id;
+
   /** 商户id */
   private Long shopId;
+
   /** 用户id */
   private Long userId;
+
   /** 用户图标 */
   @TableField(exist = false)
   private String icon;
+
   /** 用户姓名 */
   @TableField(exist = false)
   private String name;
+
   /** 是否点赞过了 */
   @TableField(exist = false)
   private Boolean isLike;

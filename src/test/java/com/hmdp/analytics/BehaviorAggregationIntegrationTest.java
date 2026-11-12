@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.hmdp.service.impl.BehaviorAggregationServiceImpl;
+import com.hmdp.support.IntegrationTestBase;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -20,7 +21,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 @SpringBootTest(
     properties = {"citylens.reliability.scheduling-enabled=false", "hmdp.analytics.enabled=false"})
-class BehaviorAggregationIntegrationTest {
+class BehaviorAggregationIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired BehaviorAggregationServiceImpl aggregation;
 

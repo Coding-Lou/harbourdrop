@@ -11,6 +11,7 @@ import com.hmdp.dto.Result;
 import com.hmdp.entity.Shop;
 import com.hmdp.entity.Voucher;
 import com.hmdp.service.IVoucherService;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.CacheClient;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
     properties = {"citylens.reliability.scheduling-enabled=false", "hmdp.cdc.enabled=false"})
-class CacheLayersIntegrationTest {
+class CacheLayersIntegrationTest extends IntegrationTestBase {
   @Autowired StringRedisTemplate redis;
   @Autowired JdbcTemplate jdbc;
   @Autowired MemcacheStore shared;

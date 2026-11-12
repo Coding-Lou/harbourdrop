@@ -1,7 +1,8 @@
 package com.hmdp;
 
+import com.hmdp.support.IntegrationTestBase;
+import jakarta.annotation.Resource;
 import java.util.concurrent.TimeUnit;
-import javax.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @Slf4j
 @SpringBootTest
-class RedissonTest {
+class RedissonTest extends IntegrationTestBase {
 
   @Resource
   private RedissonClient redissonClient;

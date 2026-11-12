@@ -185,11 +185,11 @@ hm-dianping/
 
 ### 构建和风格检查
 
-Java 本地检查需要 JDK 8 与 Maven，前端检查需要 Node.js 18+：
+Java 本地检查需要 JDK 21（项目自带 Maven Wrapper，无需单独安装 Maven），前端检查需要 Node.js 18+：
 
 ```bash
 sh dev/java-style.sh check
-mvn -DskipTests package
+./mvnw -DskipTests package
 npm --prefix frontend run check
 npm --prefix frontend test
 ```
@@ -198,14 +198,13 @@ npm --prefix frontend test
 
 ### 隔离回归
 
-[测试 Compose](dev/docker-compose.test.yml) 使用独立项目与数据库 `hmdp_optimization_test`。先创建 Maven 缓存卷，再运行：
+集成测试使用 Testcontainers：运行时自动拉起独立的 MySQL、Redis、Kafka 容器，数据库名固定为 `hmdp_optimization_test`，测试结束后容器自动销毁。只需要本机 Docker 处于运行状态：
 
 ```bash
-docker volume create hm-dianping_maven-cache
-docker compose -p hmdp-optimization-test -f dev/docker-compose.test.yml run --rm test
-# 仅清理这套明确命名的隔离测试环境
-docker compose -p hmdp-optimization-test -f dev/docker-compose.test.yml down -v
+./mvnw verify
 ```
+
+容器在一次 JVM 内只启动一次，被所有 Spring 测试上下文复用，定义见 [IntegrationTestBase](src/test/java/com/hmdp/support/IntegrationTestBase.java)。测试 JVM 固定使用 UTC，与容器内 MySQL 的 `NOW()` 保持一致。
 
 测试覆盖缓存并发与版本、真实 CDC、消息租约与去重、Kafka 聚合、秒杀身份与补偿、订单归属和页面观察接口。部分用例会清理隔离测试数据，不将测试连接指向业务数据库，也不直接以未知配置运行全部课程演示测试。
 

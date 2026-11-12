@@ -11,12 +11,14 @@ import com.hmdp.service.impl.BusinessOutboxServiceImpl;
 import com.hmdp.service.impl.OutboxRelayServiceImpl;
 import com.hmdp.service.impl.SeckillServiceImpl;
 import com.hmdp.service.impl.VoucherOrderServiceImpl;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.UserHolder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.BooleanSupplier;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -31,6 +33,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
+@Disabled("Rewritten for Kafka in migration phase 5")
 @SpringBootTest(
     properties = {
       "citylens.reliability.scheduling-enabled=false",
@@ -39,7 +42,7 @@ import org.springframework.transaction.support.TransactionTemplate;
       "hmdp.mq.group-prefix=hmdp-integration"
     })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class RocketMqIntegrationTest {
+class RocketMqIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired BusinessOutboxMapper businessOutboxMapper;
   @Autowired TransactionTemplate transactions;

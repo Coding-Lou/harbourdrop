@@ -3,22 +3,32 @@ package com.hmdp.config;
 import org.redisson.Redisson;
 import org.redisson.api.RedissonClient;
 import org.redisson.config.Config;
-import org.springframework.beans.factory.annotation.Value;
+import org.redisson.config.SingleServerConfig;
+import org.springframework.boot.autoconfigure.data.redis.RedisConnectionDetails;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Builds Redisson from the same connection details Spring Data Redis uses, so properties,
+ * environment variables and Testcontainers service connections all reach both clients.
+ */
 @Configuration
 public class RedissonConfig {
 
-  @Bean
-  public RedissonClient redissonClient(
-      @Value("${spring.redis.host}") String host,
-      @Value("${spring.redis.port:6379}") int port,
-      @Value("${spring.redis.password:}") String password) {
+  @Bean(destroyMethod = "shutdown")
+  public RedissonClient redissonClient(RedisConnectionDetails redis) {
+    RedisConnectionDetails.Standalone standalone = redis.getStandalone();
     Config config = new Config();
-    config.useSingleServer().setAddress("redis://" + host + ":" + port);
-    if (password != null && !password.isEmpty()) {
-      config.useSingleServer().setPassword(password);
+    SingleServerConfig server =
+        config
+            .useSingleServer()
+            .setAddress("redis://" + standalone.getHost() + ":" + standalone.getPort())
+            .setDatabase(standalone.getDatabase());
+    if (redis.getUsername() != null && !redis.getUsername().isEmpty()) {
+      server.setUsername(redis.getUsername());
+    }
+    if (redis.getPassword() != null && !redis.getPassword().isEmpty()) {
+      server.setPassword(redis.getPassword());
     }
     return Redisson.create(config);
   }

@@ -28,7 +28,7 @@ python3 deploy/package-release.py
 ```bash
 docker run --rm -v "$PWD:/workspace" \
   -v hm-dianping_maven-cache:/root/.m2 -w /workspace \
-  maven:3.9-eclipse-temurin-8 mvn -Dmaven.test.skip=true package
+  maven:3.9-eclipse-temurin-21 mvn -Dmaven.test.skip=true package
 python3 deploy/package-release.py
 ```
 

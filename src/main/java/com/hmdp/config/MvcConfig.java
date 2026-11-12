@@ -2,7 +2,7 @@ package com.hmdp.config;
 
 import com.hmdp.reliability.AccessGuard;
 import com.hmdp.utils.RefreshTokenInterceptor;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;

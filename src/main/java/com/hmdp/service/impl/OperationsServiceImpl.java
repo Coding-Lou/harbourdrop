@@ -9,7 +9,7 @@ import com.hmdp.mapper.MessageMapper;
 import com.hmdp.mapper.SeckillReservationMapper;
 import com.hmdp.service.IOperationsService;
 import com.hmdp.service.ISeckillService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 @Service

@@ -9,6 +9,7 @@ public class BehaviorEvent {
   private long shopId;
   private Long userId;
   private String action;
+
   /** 事件发生时间，Unix 毫秒；保留 occurredAt 作为 JSON 协议字段。 */
   private long occurredAt;
 

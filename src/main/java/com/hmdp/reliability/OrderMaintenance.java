@@ -1,7 +1,7 @@
 package com.hmdp.reliability;
 
 import com.hmdp.service.IOrderLifecycleService;
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 

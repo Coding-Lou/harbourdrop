@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.hmdp.support.IntegrationTestBase;
 import com.hmdp.utils.CacheClient;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -35,7 +36,7 @@ import org.springframework.test.util.ReflectionTestUtils;
       "hmdp.cdc.enabled=false",
       "logging.level.com.hmdp=info"
     })
-class CacheBenchmarkIntegrationTest {
+class CacheBenchmarkIntegrationTest extends IntegrationTestBase {
   @Autowired JdbcTemplate jdbc;
   @Autowired CacheClient cache;
   @Autowired TestRestTemplate http;

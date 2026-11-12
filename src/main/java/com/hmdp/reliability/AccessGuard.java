@@ -4,12 +4,13 @@ import cn.hutool.json.JSONUtil;
 import com.hmdp.dto.Result;
 import com.hmdp.service.IOperationAuditService;
 import com.hmdp.utils.UserHolder;
+import jakarta.annotation.Resource;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -43,6 +44,11 @@ public class AccessGuard implements HandlerInterceptor {
   @Override
   public boolean preHandle(HttpServletRequest req, HttpServletResponse res, Object handler)
       throws Exception {
+    // The original request was already checked; let the error page render its real status
+    // instead of turning every anonymous 404/500 into a misleading 401.
+    if (req.getDispatcherType() == DispatcherType.ERROR) {
+      return true;
+    }
     // Spring MVC strips ";params" and decodes "%xx" before routing, so prefix checks on the raw
     // URI could be bypassed (e.g. "/ops;x/..."). Reject ambiguous URIs, then match the same
     // normalized lookup path that the handler mapping uses.

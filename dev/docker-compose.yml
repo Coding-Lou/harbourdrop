@@ -132,16 +132,16 @@ services:
       mysql:
         condition: service_healthy
   java:
-    image: maven:3.9-eclipse-temurin-8
+    image: maven:3.9-eclipse-temurin-21
     working_dir: /workspace
     command: [mvn, -DskipTests, spring-boot:run]
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/hmdp?useSSL=false&serverTimezone=UTC&characterEncoding=utf8
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: ${HMDP_MYSQL_PASSWORD:-hmdp_local_only}
-      SPRING_REDIS_HOST: redis
-      SPRING_REDIS_PORT: '6379'
-      SPRING_REDIS_PASSWORD: ''
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: '6379'
+      SPRING_DATA_REDIS_PASSWORD: ''
       HMDP_MEMCACHE_ENABLED: 'true'
       HMDP_MEMCACHE_HOST: memcached
       HMDP_CDC_ENABLED: 'true'
@@ -162,7 +162,7 @@ services:
     volumes:
       - ..:/workspace
       - maven-cache:/root/.m2
-      - ../../nginx-1.18.0/html/hmdp/imgs:/uploads
+      - ${HMDP_UPLOAD_HOST_DIR:-./data/uploads}:/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -182,7 +182,7 @@ services:
       - '127.0.0.1:${HMDP_WEB_PORT:-8080}:80'
     volumes:
       - ${HMDP_FRONTEND_DIR:-../frontend}:/usr/share/nginx/html:ro
-      - ../../nginx-1.18.0/html/hmdp/imgs:/usr/share/nginx/hmdp-images:ro
+      - ${HMDP_UPLOAD_HOST_DIR:-./data/uploads}:/usr/share/nginx/hmdp-images:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - java
